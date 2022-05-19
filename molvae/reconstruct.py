@@ -34,7 +34,7 @@ stereo = True if int(opts.stereo) == 1 else False
 
 model = JTNNVAE(vocab, hidden_size, latent_size, depth, stereo=stereo)
 model.load_state_dict(torch.load(opts.model_path))
-model = model.cuda()
+# model = model.cuda()
 
 data = []
 with open(opts.test_path) as f:
@@ -52,13 +52,13 @@ for smiles in data:
     if dec_smiles == smiles3D:
         acc += 1
     tot += 1
-    print acc / tot
+    print(acc / tot)
     """
     dec_smiles = model.recon_eval(smiles3D)
     tot += len(dec_smiles)
     for s in dec_smiles:
         if s == smiles3D:
             acc += 1
-    print acc / tot
+    print(acc / tot)
     """
 

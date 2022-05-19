@@ -32,7 +32,7 @@ depth = int(opts.depth)
 
 model = JTNNVAE(vocab, hidden_size, latent_size, depth)
 model.load_state_dict(torch.load(opts.model_path))
-model = model.cuda()
+# model = model.cuda()
 
 np.random.seed(0)
 x = np.random.randn(latent_size)
@@ -49,8 +49,8 @@ z0 = z0.data.cpu().numpy()
 
 delta = 1
 nei_mols = []
-for dx in xrange(-6,7):
-    for dy in xrange(-6,7):
+for dx in range(-6,7):
+    for dy in range(-6,7):
         z = z0 + x * delta * dx + y * delta * dy
         tree_z, mol_z = torch.Tensor(z).unsqueeze(0).chunk(2, dim=1)
         tree_z, mol_z = create_var(tree_z), create_var(mol_z)
@@ -58,5 +58,5 @@ for dx in xrange(-6,7):
 
 nei_mols = [Chem.MolFromSmiles(s) for s in nei_mols]
 img = Draw.MolsToGridImage(nei_mols, molsPerRow=13, subImgSize=(200,200), useSVG=True)
-print img
+print(img)
 
