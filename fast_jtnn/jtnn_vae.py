@@ -66,8 +66,10 @@ class JTNNVAE(nn.Module):
         return z_vecs, kl_loss
 
     def sample_prior(self, prob_decode=False):
-        z_tree = torch.randn(1, self.latent_size).cuda()
-        z_mol = torch.randn(1, self.latent_size).cuda()
+        # z_tree = torch.randn(1, self.latent_size).cuda()
+        z_tree = torch.randn(1, self.latent_size)
+        # z_mol = torch.randn(1, self.latent_size).cuda()
+        z_mol = torch.randn(1, self.latent_size)
         return self.decode(z_tree, z_mol, prob_decode)
 
     def forward(self, x_batch, beta):

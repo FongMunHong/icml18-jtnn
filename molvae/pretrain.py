@@ -9,6 +9,10 @@ import math, random, sys
 from optparse import OptionParser
 from collections import deque
 
+import sys
+sys.path.append('../')
+sys.path.append('../jtnn')
+
 from jtnn import *
 import rdkit
 
@@ -41,7 +45,7 @@ for param in model.parameters():
     else:
         nn.init.xavier_normal(param)
 
-model = model.cuda()
+# model = model.cuda()
 print "Model #Params: %dK" % (sum([x.nelement() for x in model.parameters()]) / 1000,)
 
 optimizer = optim.Adam(model.parameters(), lr=1e-3)

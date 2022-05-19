@@ -34,7 +34,7 @@ stereo = True if int(opts.stereo) == 1 else False
 
 model = JTNNVAE(vocab, hidden_size, latent_size, depth, stereo=stereo)
 model.load_state_dict(torch.load(opts.model_path))
-model = model.cuda()
+# model = model.cuda()
 
 data = []
 with open(opts.test_path) as f:

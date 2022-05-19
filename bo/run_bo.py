@@ -50,7 +50,7 @@ random_seed = int(opts.random_seed)
 
 model = JTNNVAE(vocab, hidden_size, latent_size, depth)
 model.load_state_dict(torch.load(opts.model_path))
-model = model.cuda()
+# model = model.cuda()
 
 # We load the random seed
 np.random.seed(random_seed)

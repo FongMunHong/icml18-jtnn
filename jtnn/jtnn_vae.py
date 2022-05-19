@@ -163,7 +163,8 @@ class JTNNVAE(nn.Module):
         all_loss = []
         for label,le in labels:
             cur_scores = scores.narrow(0, st, le)
-            if cur_scores.data[label] >= cur_scores.max().data[0]: 
+            # if cur_scores.data[label] >= cur_scores.max().data[0]: 
+            if cur_scores.data[label] >= cur_scores.max().data: 
                 acc += 1
             label = create_var(torch.LongTensor([label]))
             all_loss.append( self.stereo_loss(cur_scores.view(1,-1), label) )

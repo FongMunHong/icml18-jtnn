@@ -27,6 +27,9 @@ class JTNNDecoder(nn.Module):
         self.W_r = nn.Linear(hidden_size, hidden_size)
         self.W_h = nn.Linear(2 * hidden_size, hidden_size)
 
+        print "latent_size: %s\n" % (latent_size + hidden_size)
+        print "hidden_size: %s\n" % hidden_size
+
         #Feature Aggregate Weights
         self.W = nn.Linear(latent_size + hidden_size, hidden_size)
         self.U = nn.Linear(latent_size + 2 * hidden_size, hidden_size)

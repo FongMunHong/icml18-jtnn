@@ -36,7 +36,8 @@ sim_cutoff = float(opts.cutoff)
 
 model = JTPropVAE(vocab, hidden_size, latent_size, depth)
 model.load_state_dict(torch.load(opts.model_path))
-model = model.cuda()
+# model = model.cuda()
+model = model
 
 data = []
 with open(opts.test_path) as f:

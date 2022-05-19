@@ -40,7 +40,7 @@ load_dict = torch.load(opts.model_path)
 missing = {k: v for k, v in model.state_dict().items() if k not in load_dict}
 load_dict.update(missing) 
 model.load_state_dict(load_dict)
-model = model.cuda()
+# model = model.cuda()
 
 torch.manual_seed(0)
 for i in xrange(nsample):
