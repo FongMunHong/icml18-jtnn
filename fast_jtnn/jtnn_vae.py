@@ -176,7 +176,8 @@ class JTNNVAE(nn.Module):
             return None, cur_mol
 
         cand_smiles,cand_amap = zip(*cands)
-        aroma_score = torch.Tensor(aroma_score).cuda()
+        # aroma_score = torch.Tensor(aroma_score).cuda()
+        aroma_score = torch.Tensor(aroma_score)
         cands = [(smiles, all_nodes, cur_node) for smiles in cand_smiles]
 
         if len(cands) > 1:

@@ -6,6 +6,9 @@ import math, random, sys
 from optparse import OptionParser
 import cPickle as pickle
 
+sys.path.append('../')
+sys.path.append('../fast_jtnn')
+
 from fast_jtnn import *
 import rdkit
 

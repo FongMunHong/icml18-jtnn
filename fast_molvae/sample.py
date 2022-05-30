@@ -26,7 +26,7 @@ vocab = Vocab(vocab)
 
 model = JTNNVAE(vocab, args.hidden_size, args.latent_size, args.depthT, args.depthG)
 model.load_state_dict(torch.load(args.model))
-model = model.cuda()
+# model = model.cuda()
 
 torch.manual_seed(0)
 for i in xrange(args.nsample):

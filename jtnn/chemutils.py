@@ -64,6 +64,7 @@ def copy_edit_mol(mol):
         new_mol.AddBond(a1, a2, bt)
     return new_mol
 
+# get fragment of molecule based on index feed in by (atoms) list
 def get_clique_mol(mol, atoms):
     smiles = Chem.MolFragmentToSmiles(mol, atoms, kekuleSmiles=True)
     new_mol = Chem.MolFromSmiles(smiles, sanitize=False)
@@ -337,7 +338,7 @@ if __name__ == "__main__":
     assert len(mol_tree.nodes) > 0
 
     def tree_test():
-        for s in sys.stdin:
+        for s in smiles:
             s = s.split()[0]
             tree = MolTree(s)
             print '-------------------------------------------'
@@ -347,7 +348,7 @@ if __name__ == "__main__":
 
     def decode_test():
         wrong = 0
-        for tot,s in enumerate(sys.stdin):
+        for tot,s in enumerate(smiles):
             s = s.split()[0]
             tree = MolTree(s)
             tree.recover()
@@ -383,6 +384,7 @@ if __name__ == "__main__":
 
     def count():
         cnt,n = 0,0
+        # for s in sys.stdin:
         for s in sys.stdin:
             s = s.split()[0]
             tree = MolTree(s)
@@ -393,4 +395,7 @@ if __name__ == "__main__":
             n += len(tree.nodes)
             #print cnt * 1.0 / n
     
-    count()
+    # count()
+
+    tree_test()
+    decode_test()

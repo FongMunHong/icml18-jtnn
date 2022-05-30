@@ -11,6 +11,9 @@ import argparse
 from collections import deque
 import cPickle as pickle
 
+sys.path.append('../')
+sys.path.append('../fast_jtnn')
+
 from fast_jtnn import *
 import rdkit
 
