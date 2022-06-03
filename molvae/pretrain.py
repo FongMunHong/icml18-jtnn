@@ -52,6 +52,7 @@ optimizer = optim.Adam(model.parameters(), lr=1e-3)
 scheduler = lr_scheduler.ExponentialLR(optimizer, 0.9)
 scheduler.step()
 
+# tree decomposition happens here
 dataset = MoleculeDataset(opts.train_path)
 
 MAX_EPOCH = 3
@@ -70,7 +71,15 @@ for epoch in xrange(MAX_EPOCH):
                     node.cand_mols.append(node.label_mol)
 
         model.zero_grad()
+        # tree encoding happens here (VAE training)
         loss, kl_div, wacc, tacc, sacc, dacc = model(batch, beta=0)
+        # print "type", type(loss)
+        # print "loss", loss
+        # print "\n"
+
+        raise 
+
+
         loss.backward()
         optimizer.step()
 

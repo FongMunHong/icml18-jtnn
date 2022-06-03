@@ -28,6 +28,7 @@ class JTNNEncoder(nn.Module):
     def forward(self, root_batch):
         orders = []
         for root in root_batch:
+            # print('root', root.clique)
             order = get_prop_order(root)
             orders.append(order)
         
@@ -57,6 +58,7 @@ class JTNNEncoder(nn.Module):
                 h_nei.extend([padding] * pad_len)
                 cur_h_nei.extend(h_nei)
 
+            print('cur_x', cur_x)
             cur_x = create_var(torch.LongTensor(cur_x))
             cur_x = self.embedding(cur_x)
             cur_h_nei = torch.cat(cur_h_nei, dim=0).view(-1,MAX_NB,self.hidden_size)

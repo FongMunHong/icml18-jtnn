@@ -18,6 +18,10 @@ def index_select_ND(source, dim, index):
     return target.view(final_size)
 
 def GRU(x, h_nei, W_z, W_r, U_r, W_h):
+
+    # print "x", x
+    # print "h_nei", h_nei 
+
     hidden_size = x.size()[-1]
     sum_h = h_nei.sum(dim=1)
     z_input = torch.cat([x,sum_h], dim=1)
@@ -32,6 +36,11 @@ def GRU(x, h_nei, W_z, W_r, U_r, W_h):
     h_input = torch.cat([x,sum_gated_h], dim=1)
     pre_h = nn.Tanh()(W_h(h_input))
     new_h = (1.0 - z) * sum_h + z * pre_h
+
+    # print new_h
+
+    raise
+
     return new_h
 
 

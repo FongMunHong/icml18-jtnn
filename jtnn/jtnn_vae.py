@@ -17,10 +17,27 @@ import copy, math
 def set_batch_nodeID(mol_batch, vocab):
     tot = 0
     for mol_tree in mol_batch:
+        
+        print "smiles",  mol_tree.smiles
+        print mol_tree.nodes[0].smiles # smiles of fragments/vocabs/node of molecular tree
+        print "vocab_idx", vocab.get_index(mol_tree.nodes[0].smiles)
+        print "node properties ", dir(mol_tree.nodes[0])
+        mol_tree.nodes[0].idx = 1
+        print "\n"
+        print "node properties ", dir(mol_tree.nodes[0])
+        
+        print "node cliques: ", mol_tree.nodes[0].clique
+        print "node nid 0: ", mol_tree.nodes[0].nid
+        print "node nid 1:", mol_tree.nodes[1].nid
+        print "node nid 5:", mol_tree.nodes[5].mol
+        print "\n"
+
+        raise
         for node in mol_tree.nodes:
             node.idx = tot
             node.wid = vocab.get_index(node.smiles)
             tot += 1
+        
 
 class JTNNVAE(nn.Module):
 
@@ -49,6 +66,10 @@ class JTNNVAE(nn.Module):
     
     def encode(self, mol_batch):
         set_batch_nodeID(mol_batch, self.vocab)
+        print('mol_batch', mol_batch)
+
+        raise
+
         root_batch = [mol_tree.nodes[0] for mol_tree in mol_batch]
         tree_mess,tree_vec = self.jtnn(root_batch)
 
@@ -67,6 +88,7 @@ class JTNNVAE(nn.Module):
         return torch.cat([tree_mean,mol_mean], dim=1)
 
     def forward(self, mol_batch, beta=0):
+        # print ('i am in forward')
         batch_size = len(mol_batch)
 
         tree_mess, tree_vec, mol_vec = self.encode(mol_batch)
