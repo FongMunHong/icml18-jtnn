@@ -87,6 +87,7 @@ class JTNNVAE(nn.Module):
         _, tree_vec, mol_vec = self.encode(mol_batch)
         tree_mean = self.T_mean(tree_vec)
         mol_mean = self.G_mean(mol_vec)
+        # side by side concatenation
         return torch.cat([tree_mean,mol_mean], dim=1)
 
     def forward(self, mol_batch, beta=0):
