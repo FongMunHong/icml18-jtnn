@@ -95,35 +95,13 @@ class MolTree(object):
         cliques, edges = tree_decomp(self.mol)
         self.nodes = []
         root = 0
-
-
-        # smiles = "CC[C@@H]1CN(C(=O)c2csnn2)CC[C@H]1c1ccccc1"
-        
-        # cliques are just subgraphs/fragments of the molecule which are part of the vocab, the numbers are atoms numbers on the molecule which can form fragment
-        # cliques = [[0, 1], [1, 2], [4, 5], [5, 6], [5, 7], [14, 15], [2, 14, 13, 12, 4, 3], [8, 7, 11, 10, 9], [16, 17, 18, 19, 20, 15], [5]]
-        
-        # edges are for Mol tree, where each number represent a certain clique
-        # edges = [(0, 13), (1, 13), (2, 10), (2, 13), (3, 10), (3, 14), (4, 14), (5, 14), (5, 15), (6, 7), (6, 15), (7, 11), (8, 12), (8, 15), (9, 10)]
-
-        # print("\n")
-        # print(smiles)
-        # print "length", len(mol.GetAtoms())
-        # print "cliques", cliques
-        # print "edges", edges
-
-
         for i,c in enumerate(cliques):
-            # get_clique_mol - get fragments of that molecule
-            # that fragment will belong a MolTreeNode
             cmol = get_clique_mol(self.mol, c)
             node = MolTreeNode(get_smiles(cmol), c)
             self.nodes.append(node)
             if min(c) == 0:
                 root = i
 
-        # print "nodes", self.nodes
-
-        # tree neighbors node labelling
         for x,y in edges:
             self.nodes[x].add_neighbor(self.nodes[y])
             self.nodes[y].add_neighbor(self.nodes[x])
@@ -158,8 +136,7 @@ if __name__ == "__main__":
         smiles = line.split()[0]
         mol = MolTree(smiles)
         for c in mol.nodes:
-            print c.smiles
             cset.add(c.smiles)
     for x in cset:
-        print x
+        print(x)
 

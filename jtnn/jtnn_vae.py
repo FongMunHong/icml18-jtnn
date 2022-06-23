@@ -17,27 +17,10 @@ import copy, math
 def set_batch_nodeID(mol_batch, vocab):
     tot = 0
     for mol_tree in mol_batch:
-        
-        # print "smiles",  mol_tree.smiles
-        # print mol_tree.nodes[0].smiles # smiles of fragments/vocabs/node of molecular tree
-        # print "vocab_idx", vocab.get_index(mol_tree.nodes[0].smiles)
-        # print "node properties ", dir(mol_tree.nodes[0])
-        # mol_tree.nodes[0].idx = 1
-        # print "\n"
-        # print "node properties ", dir(mol_tree.nodes[0])
-        
-        # print "node cliques: ", mol_tree.nodes[0].clique
-        # print "node nid 0: ", mol_tree.nodes[0].nid
-        # print "node nid 1:", mol_tree.nodes[1].nid
-        # print "node nid 5:", mol_tree.nodes[5].mol
-        # print "\n"
-
-        # raise
         for node in mol_tree.nodes:
             node.idx = tot
             node.wid = vocab.get_index(node.smiles)
             tot += 1
-        
 
 class JTNNVAE(nn.Module):
 
@@ -52,12 +35,12 @@ class JTNNVAE(nn.Module):
         self.jtnn = JTNNEncoder(vocab, hidden_size, self.embedding)
         self.jtmpn = JTMPN(hidden_size, depth)
         self.mpn = MPN(hidden_size, depth)
-        self.decoder = JTNNDecoder(vocab, hidden_size, latent_size / 2, self.embedding)
+        self.decoder = JTNNDecoder(vocab, hidden_size, int(latent_size / 2), self.embedding)
 
-        self.T_mean = nn.Linear(hidden_size, latent_size / 2)
-        self.T_var = nn.Linear(hidden_size, latent_size / 2)
-        self.G_mean = nn.Linear(hidden_size, latent_size / 2)
-        self.G_var = nn.Linear(hidden_size, latent_size / 2)
+        self.T_mean = nn.Linear(hidden_size, int(latent_size / 2))
+        self.T_var = nn.Linear(hidden_size, int(latent_size / 2))
+        self.G_mean = nn.Linear(hidden_size, int(latent_size / 2))
+        self.G_var = nn.Linear(hidden_size, int(latent_size / 2))
         
         self.assm_loss = nn.CrossEntropyLoss(size_average=False)
         self.use_stereo = stereo
@@ -66,14 +49,8 @@ class JTNNVAE(nn.Module):
     
     def encode(self, mol_batch):
         set_batch_nodeID(mol_batch, self.vocab)
-        # print('mol_batch', mol_batch)
-
-        # root batch store all the roots of mol tree in the batch
         root_batch = [mol_tree.nodes[0] for mol_tree in mol_batch]
-
         tree_mess,tree_vec = self.jtnn(root_batch)
-
-        raise
 
         smiles_batch = [mol_tree.smiles for mol_tree in mol_batch]
         mol_vec = self.mpn(mol2graph(smiles_batch))
@@ -87,11 +64,9 @@ class JTNNVAE(nn.Module):
         _, tree_vec, mol_vec = self.encode(mol_batch)
         tree_mean = self.T_mean(tree_vec)
         mol_mean = self.G_mean(mol_vec)
-        # side by side concatenation
         return torch.cat([tree_mean,mol_mean], dim=1)
 
     def forward(self, mol_batch, beta=0):
-        # print ('i am in forward')
         batch_size = len(mol_batch)
 
         tree_mess, tree_vec, mol_vec = self.encode(mol_batch)
@@ -105,9 +80,9 @@ class JTNNVAE(nn.Module):
         z_log_var = torch.cat([tree_log_var,mol_log_var], dim=1)
         kl_loss = -0.5 * torch.sum(1.0 + z_log_var - z_mean * z_mean - torch.exp(z_log_var)) / batch_size
 
-        epsilon = create_var(torch.randn(batch_size, self.latent_size / 2), False)
+        epsilon = create_var(torch.randn(batch_size, int(self.latent_size / 2)), False)
         tree_vec = tree_mean + torch.exp(tree_log_var / 2) * epsilon
-        epsilon = create_var(torch.randn(batch_size, self.latent_size / 2), False)
+        epsilon = create_var(torch.randn(batch_size, int(self.latent_size / 2)), False)
         mol_vec = mol_mean + torch.exp(mol_log_var / 2) * epsilon
         
         word_loss, topo_loss, word_acc, topo_acc = self.decoder(mol_batch, tree_vec)
@@ -138,8 +113,8 @@ class JTNNVAE(nn.Module):
         batch_idx = create_var(torch.LongTensor(batch_idx))
         mol_vec = mol_vec.index_select(0, batch_idx)
 
-        mol_vec = mol_vec.view(-1, 1, self.latent_size / 2)
-        cand_vec = cand_vec.view(-1, self.latent_size / 2, 1)
+        mol_vec = mol_vec.view(-1, 1, int(self.latent_size / 2))
+        cand_vec = cand_vec.view(-1, int(self.latent_size / 2), 1)
         scores = torch.bmm(mol_vec, cand_vec).squeeze()
         
         cnt,tot,acc = 0,0,0
@@ -208,9 +183,9 @@ class JTNNVAE(nn.Module):
         mol_mean = self.G_mean(mol_vec)
         mol_log_var = -torch.abs(self.G_var(mol_vec)) #Following Mueller et al.
 
-        epsilon = create_var(torch.randn(1, self.latent_size / 2), False)
+        epsilon = create_var(torch.randn(1, int(self.latent_size / 2)), False)
         tree_vec = tree_mean + torch.exp(tree_log_var / 2) * epsilon
-        epsilon = create_var(torch.randn(1, self.latent_size / 2), False)
+        epsilon = create_var(torch.randn(1, int(self.latent_size / 2)), False)
         mol_vec = mol_mean + torch.exp(mol_log_var / 2) * epsilon
         return self.decode(tree_vec, mol_vec, prob_decode)
 
@@ -225,26 +200,26 @@ class JTNNVAE(nn.Module):
         mol_log_var = -torch.abs(self.G_var(mol_vec)) #Following Mueller et al.
         
         all_smiles = []
-        for i in xrange(10):
-            epsilon = create_var(torch.randn(1, self.latent_size / 2), False)
+        for i in range(10):
+            epsilon = create_var(torch.randn(1, int(self.latent_size / 2)), False)
             tree_vec = tree_mean + torch.exp(tree_log_var / 2) * epsilon
-            epsilon = create_var(torch.randn(1, self.latent_size / 2), False)
+            epsilon = create_var(torch.randn(1, int(self.latent_size / 2)), False)
             mol_vec = mol_mean + torch.exp(mol_log_var / 2) * epsilon
-            for j in xrange(10):
+            for j in range(10):
                 new_smiles = self.decode(tree_vec, mol_vec, prob_decode=True)
                 all_smiles.append(new_smiles)
         return all_smiles
 
     def sample_prior(self, prob_decode=False):
-        tree_vec = create_var(torch.randn(1, self.latent_size / 2), False)
-        mol_vec = create_var(torch.randn(1, self.latent_size / 2), False)
+        tree_vec = create_var(torch.randn(1, int(self.latent_size / 2)), False)
+        mol_vec = create_var(torch.randn(1, int(self.latent_size / 2)), False)
         return self.decode(tree_vec, mol_vec, prob_decode)
 
     def sample_eval(self):
-        tree_vec = create_var(torch.randn(1, self.latent_size / 2), False)
-        mol_vec = create_var(torch.randn(1, self.latent_size / 2), False)
+        tree_vec = create_var(torch.randn(1, int(self.latent_size / 2)), False)
+        mol_vec = create_var(torch.randn(1, int(self.latent_size / 2)), False)
         all_smiles = []
-        for i in xrange(100):
+        for i in range(100):
             s = self.decode(tree_vec, mol_vec, prob_decode=True)
             all_smiles.append(s)
         return all_smiles
@@ -316,7 +291,7 @@ class JTNNVAE(nn.Module):
             _,cand_idx = torch.sort(scores, descending=True)
 
         backup_mol = Chem.RWMol(cur_mol)
-        for i in xrange(cand_idx.numel()):
+        for i in range(cand_idx.numel()):
             cur_mol = Chem.RWMol(backup_mol)
             pred_amap = cand_amap[cand_idx[i].item()]
             new_global_amap = copy.deepcopy(global_amap)

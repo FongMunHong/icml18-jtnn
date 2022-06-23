@@ -20,7 +20,7 @@ class JTNNVAE(nn.Module):
         super(JTNNVAE, self).__init__()
         self.vocab = vocab
         self.hidden_size = hidden_size
-        self.latent_size = latent_size = latent_size / 2 #Tree and Mol has two vectors
+        self.latent_size = latent_size = int(latent_size / 2) #Tree and Mol has two vectors
 
         self.jtnn = JTNNEncoder(hidden_size, depthT, nn.Embedding(vocab.size(), hidden_size))
         self.decoder = JTNNDecoder(vocab, hidden_size, latent_size, nn.Embedding(vocab.size(), hidden_size))
@@ -66,10 +66,8 @@ class JTNNVAE(nn.Module):
         return z_vecs, kl_loss
 
     def sample_prior(self, prob_decode=False):
-        # z_tree = torch.randn(1, self.latent_size).cuda()
-        z_tree = torch.randn(1, self.latent_size)
-        # z_mol = torch.randn(1, self.latent_size).cuda()
-        z_mol = torch.randn(1, self.latent_size)
+        z_tree = torch.randn(1, self.latent_size).cuda()
+        z_mol = torch.randn(1, self.latent_size).cuda()
         return self.decode(z_tree, z_mol, prob_decode)
 
     def forward(self, x_batch, beta):
@@ -176,8 +174,7 @@ class JTNNVAE(nn.Module):
             return None, cur_mol
 
         cand_smiles,cand_amap = zip(*cands)
-        # aroma_score = torch.Tensor(aroma_score).cuda()
-        aroma_score = torch.Tensor(aroma_score)
+        aroma_score = torch.Tensor(aroma_score).cuda()
         cands = [(smiles, all_nodes, cur_node) for smiles in cand_smiles]
 
         if len(cands) > 1:

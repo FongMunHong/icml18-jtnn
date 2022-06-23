@@ -8,7 +8,7 @@
 #
 # several small modifications to the original paper are included
 # particularly slightly different formula for marocyclic penalty
-# and taking into account also molecule symmetry (fingerprint density)
+# and taking into account also molecule symmetry (fingerprint(density)
 #
 # for a set of 10k diverse molecules the agreement between the original method
 # as implemented in PipelinePilot and this implementation is r2 = 0.97
@@ -82,7 +82,7 @@ def calculateScore(m):
 
   score2 = 0. -sizePenalty -stereoPenalty -spiroPenalty -bridgePenalty -macrocyclePenalty
 
-  # correction for the fingerprint density
+  # correction for the fingerprint(density
   # not in the original publication, added in version 1.1
   # to make highly symmetrical molecules easier to synthetise
   score3 = 0.

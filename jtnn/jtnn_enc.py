@@ -28,26 +28,18 @@ class JTNNEncoder(nn.Module):
     def forward(self, root_batch):
         orders = []
         for root in root_batch:
-
-            # get prop order - to get the proper order to traverse the mol tree from the root
             order = get_prop_order(root)
-            # print(order)
             orders.append(order)
         
         h = {}
         max_depth = max([len(x) for x in orders])
         padding = create_var(torch.zeros(self.hidden_size), False)
-        print('padding', padding)
 
-        print('max_depth', max_depth)
-
-        for t in xrange(max_depth):
+        for t in range(max_depth):
             prop_list = []
             for order in orders:
                 if t < len(order):
                     prop_list.extend(order[t])
-
-            # print('prop_list', prop_list)
 
             cur_x = []
             cur_h_nei = []
@@ -61,46 +53,18 @@ class JTNNEncoder(nn.Module):
                     if z == y: continue
                     h_nei.append(h[(z,x)])
 
-
                 pad_len = MAX_NB - len(h_nei)
                 h_nei.extend([padding] * pad_len)
                 cur_h_nei.extend(h_nei)
 
-            # cur_x indicates the index of the fragments
-            # and those index has it's correponding embedding 
-            # retrieved using embedding(cur_x)
-
-            # h_nei and cur_h_nei
-            print('cur_x', cur_x)
-            # print('len h_nei', len(h_nei))
-            # print('cur_h_nei', cur_h_nei)
-
             cur_x = create_var(torch.LongTensor(cur_x))
             cur_x = self.embedding(cur_x)
-            print('embedding cur_x', cur_x)
-            
-            print('cur_h_nei 1 size', len(cur_h_nei), cur_h_nei[0].size())
-
-            # view makes the tensor to look like 60, 8, 450
             cur_h_nei = torch.cat(cur_h_nei, dim=0).view(-1,MAX_NB,self.hidden_size)
-
-            print('cur_h_nei 2 size', cur_h_nei.size())
-            print('cur_x size', cur_x.size())
 
             new_h = GRU(cur_x, cur_h_nei, self.W_z, self.W_r, self.U_r, self.W_h)
             for i,m in enumerate(prop_list):
-                # m is the tuple of two MolTreeNode
                 x,y = m[0].idx,m[1].idx
                 h[(x,y)] = new_h[i]
-                # print(new_h[i])
-
-            # raise
-
-        # h stores edges? pairs of index of MolTreeNode (fragements)
-        # values is the GRU learned candidate embedding
-        print('h map', h.keys())
-        print('h map', h.values()[0])
-        raise
 
         root_vecs = node_aggregate(root_batch, h, self.embedding, self.W)
 
@@ -143,8 +107,6 @@ def node_aggregate(nodes, h, embedding, W):
         nei.extend([padding] * pad_len)
         h_nei.extend(nei)
     
-    print(x_idx)
-
     h_nei = torch.cat(h_nei, dim=0).view(-1,MAX_NB,hidden_size)
     sum_h_nei = h_nei.sum(dim=1)
     x_vec = create_var(torch.LongTensor(x_idx))

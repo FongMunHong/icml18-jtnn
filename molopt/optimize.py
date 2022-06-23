@@ -37,7 +37,6 @@ sim_cutoff = float(opts.cutoff)
 model = JTPropVAE(vocab, hidden_size, latent_size, depth)
 model.load_state_dict(torch.load(opts.model_path))
 # model = model.cuda()
-model = model
 
 data = []
 with open(opts.test_path) as f:
@@ -55,6 +54,6 @@ for smiles in data:
     new_score = Descriptors.MolLogP(new_mol) - sascorer.calculateScore(new_mol)
 
     res.append( (new_score - score, sim, score, new_score, smiles, new_smiles) )
-    print new_score - score, sim, score, new_score, smiles, new_smiles
+    print(new_score - score, sim, score, new_score, smiles, new_smiles)
 
-print sum([x[0] for x in res]), sum([x[1] for x in res])
+print(sum([x[0] for x in res]), sum([x[1] for x in res]))
