@@ -70,7 +70,7 @@ class JTNNEncoder(nn.Module):
             # and those index has it's correponding embedding 
             # retrieved using embedding(cur_x)
 
-            # h_nei and cur_h_nei
+            # h_nei and cur_h_nei hello
             print('cur_x', cur_x)
             # print('len h_nei', len(h_nei))
             # print('cur_h_nei', cur_h_nei)
