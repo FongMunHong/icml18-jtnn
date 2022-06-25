@@ -4,6 +4,7 @@ from collections import deque
 from mol_tree import Vocab, MolTree
 from nnutils import create_var, GRU
 
+# max neighbors of a clique or atom?
 MAX_NB = 8
 
 class JTNNEncoder(nn.Module):
@@ -56,6 +57,15 @@ class JTNNEncoder(nn.Module):
                 pad_len = MAX_NB - len(h_nei)
                 h_nei.extend([padding] * pad_len)
                 cur_h_nei.extend(h_nei)
+
+            # cur_x indicates the index of the fragments
+            # and those index has it's correponding embedding 
+            # retrieved using embedding(cur_x)
+
+            # h_nei and cur_h_nei hello
+            print('cur_x', cur_x)
+            # print('len h_nei', len(h_nei))
+            # print('cur_h_nei', cur_h_nei)
 
             cur_x = create_var(torch.LongTensor(cur_x))
             cur_x = self.embedding(cur_x)
