@@ -52,13 +52,9 @@ class JTNNVAE(nn.Module):
         # get all the root of the entire tree batch
         # which means there will if batch size 40
         # we have 40 trees, with their root all together
-        root_batch = [mol_tree.nodes[0] for mol_tree in mol_batch]
-        # neigh_list = []
-        # for node in mol_batch[0].nodes:
-        #     neigh_list.append([neigh.idx for neigh in node.neighbors])
-        #     print('node', node.idx)
-        #     print('neigh', [neigh.idx for neigh in node.neighbors])            
-        tree_mess,tree_vec = self.jtnn(root_batch)
+        root_batch = [mol_tree.nodes[0] for mol_tree in mol_batch]           
+        # tree_mess,tree_vec = self.jtnn(root_batch)
+        tree_mess, tree_vec = [], []
 
         smiles_batch = [mol_tree.smiles for mol_tree in mol_batch]
         mol_vec = self.mpn(mol2graph(smiles_batch))

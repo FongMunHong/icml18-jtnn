@@ -43,27 +43,40 @@ def mol2graph(mol_batch):
         #mol = Chem.MolFromSmiles(smiles)
         n_atoms = mol.GetNumAtoms()
         for atom in mol.GetAtoms():
+            # atom features gets one hot encoding of atom attributes
             fatoms.append( atom_features(atom) )
-            in_bonds.append([])
+            in_bonds.append([]) # in_bonds for that specific atom
 
         for bond in mol.GetBonds():
             a1 = bond.GetBeginAtom()
             a2 = bond.GetEndAtom()
-            x = a1.GetIdx() + total_atoms
+            x = a1.GetIdx() + total_atoms # add total_atoms so that index does not overlap
             y = a2.GetIdx() + total_atoms
+
+            # all bonds for one molecule [(-1, -1), (0, 1), (1, 0), (1, 2), (2, 1), (2, 3), (3, 2), (3, 4), (4, 3), (4, 5), (5, 4), (5, 6), (6, 5), (6, 7), (7, 6), (7, 8), (8, 7), (8, 9), (9, 8), (9, 10), (10, 9), (10, 11), (11, 10), (10, 12), (12, 10), (12, 13), (13, 12), (13, 14), (14, 13), (14, 15), (15, 14), (15, 16), (16, 15), (16, 17), (17, 16), (16, 18), (18, 16), (9, 19), (19, 9), (19, 20), (20, 19), (4, 21), (21, 4), (21, 22), (22, 21), (22, 1), (1, 22), (20, 6), (6, 20), (18, 12)]
+            # in_bonds for one molecule [[2], [1, 4, 45], [3, 6], [5, 8], [7, 10, 42], [9, 12], [11, 14, 47], [13, 16], [15, 18], [17, 20, 38], [19, 22, 24], [21], [23, 26], [25, 28], [27, 30], [29, 32], [31, 34, 36], [33], [35], [37, 40], [39, 48], [41, 44], [43, 46]]
 
             b = len(all_bonds) 
             all_bonds.append((x,y))
-            fbonds.append( torch.cat([fatoms[x], bond_features(bond)], 0) )
+            # fatoms[x] to access one hot encoding of that atom
+            # bond_features(bond) - bondtype + stereo prop one hot encoding
+            fbonds.append( torch.cat([fatoms[x], bond_features(bond)], 0) ) 
             in_bonds[y].append(b)
 
             b = len(all_bonds)
             all_bonds.append((y,x))
             fbonds.append( torch.cat([fatoms[y], bond_features(bond)], 0) )
             in_bonds[x].append(b)
+
+        # print('smiles', smiles)
+        # print('total atoms', get_mol(smiles).GetNumAtoms())
+        # print('in_bonds', in_bonds)
+        # print('fbonds', fbonds)
+        # raise
         
         scope.append((total_atoms,n_atoms))
         total_atoms += n_atoms
+
 
     total_bonds = len(all_bonds)
     fatoms = torch.stack(fatoms, 0)
@@ -81,6 +94,13 @@ def mol2graph(mol_batch):
             if all_bonds[b2][0] != y:
                 bgraph[b1,i] = b2
 
+
+    print('fatoms size', fatoms.size()) # total atoms, one hot encoding of atoms(39) 
+    print('fbonds size', fbonds.size()) # total bonds, one hot encoding of atoms + bonds
+    print('agraph size', agraph.size()) # total atoms of 40 trees, MAX_NB (6)
+    print('bgraph size', bgraph.size()) # total bonds of 40 trees, SIZE (6)
+    print('scope size', len(scope))
+
     return fatoms, fbonds, agraph, bgraph, scope
 
 class MPN(nn.Module):
@@ -96,17 +116,26 @@ class MPN(nn.Module):
 
     def forward(self, mol_graph):
         fatoms,fbonds,agraph,bgraph,scope = mol_graph
-        fatoms = create_var(fatoms)
-        fbonds = create_var(fbonds)
-        agraph = create_var(agraph)
+        fatoms = create_var(fatoms) # atom only
+        fbonds = create_var(fbonds) # atom + bond
+        agraph = create_var(agraph) # agraph indexed by atoms 0 -> [1, 35, 44, 0, 0, 0]
         bgraph = create_var(bgraph)
 
-        binput = self.W_i(fbonds)
+        # x[uv] to indicate bond type
+        binput = self.W_i(fbonds) # atom + bonds -- bond indexed (0, 1), (1, 0), (0, 2), (2, 0)
         message = nn.ReLU()(binput)
 
+        print('message', message)
+        print('message size', message.size())
+
+        # two hidden vectors ν[uv] and ν[vu] denoting
+        # the message from u to v and vice versa
         for i in range(self.depth - 1):
-            nei_message = index_select_ND(message, 0, bgraph)
+            nei_message = index_select_ND(message, 0, bgraph) # bgraph index by bonds (0-1) -> [0, 35, 44, 0, 0, 0]
+            # print('nei_message', nei_message)
+            # print('nei_message size', nei_message.size())
             nei_message = nei_message.sum(dim=1)
+            # print('nei_message size 2', nei_message.size())
             nei_message = self.W_h(nei_message)
             message = nn.ReLU()(binput + nei_message)
 
@@ -121,5 +150,6 @@ class MPN(nn.Module):
             mol_vecs.append(mol_vec)
 
         mol_vecs = torch.stack(mol_vecs, dim=0)
+        # print('shape', mol_vecs.size()) # mol_vecs shape 40 x 450
         return mol_vecs
 

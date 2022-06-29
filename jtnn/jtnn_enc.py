@@ -34,12 +34,12 @@ class JTNNEncoder(nn.Module):
             order = get_prop_order(root)
             orders.append(order)
 
-        for i, order in enumerate(orders[:1]):
-            print(i , 'pair', '-root:', root_batch[i].idx)
-            print('root neighbors', [nei.idx for nei in root_batch[i].neighbors])
-            for pairs in order:
-                pair = [tuple(node.idx for node in pair) for pair in pairs]
-                print(pair, end=" | ")
+        # for i, order in enumerate(orders[:1]):
+        #     print(i , 'pair', '-root:', root_batch[i].idx)
+        #     print('root neighbors', [nei.idx for nei in root_batch[i].neighbors])
+        #     for pairs in order:
+        #         pair = [tuple(node.idx for node in pair) for pair in pairs]
+        #         print(pair, end=" | ")
 
         #     print('\n')
 
@@ -55,7 +55,7 @@ class JTNNEncoder(nn.Module):
         # out of the 40 separate trees, which one has the deepest depth or highest number of edges
         max_depth = max([len(x) for x in orders])
         padding = create_var(torch.zeros(self.hidden_size), False)
-        print('padding', padding.size())
+        # print('padding', padding.size())
 
         # prop_list - propagation list
         for t in range(max_depth):
@@ -141,6 +141,7 @@ def get_prop_order(root):
     visited = set([root.idx])
     root.depth = 0
     order1,order2 = [],[]
+    # I believe this a BFS implementation, since there is no recursion
     while len(queue) > 0:
         x = queue.popleft()
         for y in x.neighbors:
@@ -179,7 +180,8 @@ def node_aggregate(nodes, h, embedding, W):
     sum_h_nei = h_nei.sum(dim=1) # 40, 450 - root batch size (number of roots), hidden size 
     x_vec = create_var(torch.LongTensor(x_idx))
     x_vec = embedding(x_vec)
-    node_vec = torch.cat([x_vec, sum_h_nei], dim=1) # the root itself and it's neighbors
+    node_vec = torch.cat([x_vec, sum_h_nei], dim=1) # the root itself and it's neighbors (40, 450) + (40, 450)
+    # print(node_vec.size()) # size is (40, 900 [450 + 450])
     # transforming function for the root vector
-    return nn.ReLU()(W(node_vec))
+    return nn.ReLU()(W(node_vec)) # [40 x 900 (.) 900 x 450] == [40 x 450]
 
