@@ -174,8 +174,8 @@ def node_aggregate(nodes, h, embedding, W):
         h_nei.extend(nei)
         # print(torch.cat(nei, dim=0).view(-1, MAX_NB, hidden_size).tolist())
     
-    h_nei = torch.cat(h_nei, dim=0).view(-1,MAX_NB,hidden_size)
-    print('hnei', h_nei.size())
+    h_nei = torch.cat(h_nei, dim=0).view(-1,MAX_NB,hidden_size) # 40 mol tree, 8 neigh, 450 hidden feature embedding
+    # print('hnei', h_nei.size())
     # aggregating function for the root node, sum all the columns
     sum_h_nei = h_nei.sum(dim=1) # 40, 450 - root batch size (number of roots), hidden size 
     x_vec = create_var(torch.LongTensor(x_idx))

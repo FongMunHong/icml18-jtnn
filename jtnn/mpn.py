@@ -95,11 +95,11 @@ def mol2graph(mol_batch):
                 bgraph[b1,i] = b2
 
 
-    print('fatoms size', fatoms.size()) # total atoms, one hot encoding of atoms(39) 
-    print('fbonds size', fbonds.size()) # total bonds, one hot encoding of atoms + bonds
-    print('agraph size', agraph.size()) # total atoms of 40 trees, MAX_NB (6)
-    print('bgraph size', bgraph.size()) # total bonds of 40 trees, SIZE (6)
-    print('scope size', len(scope))
+    # print('fatoms size', fatoms.size()) # total atoms, one hot encoding of atoms(39) 
+    # print('fbonds size', fbonds.size()) # total bonds, one hot encoding of atoms + bonds
+    # print('agraph size', agraph.size()) # total atoms of 40 trees, MAX_NB (6)
+    # print('bgraph size', bgraph.size()) # total bonds of 40 trees, SIZE (6)
+    # print('scope size', len(scope))
 
     return fatoms, fbonds, agraph, bgraph, scope
 
@@ -125,12 +125,12 @@ class MPN(nn.Module):
         binput = self.W_i(fbonds) # atom + bonds -- bond indexed (0, 1), (1, 0), (0, 2), (2, 0)
         message = nn.ReLU()(binput)
 
-        print('message', message)
-        print('message size', message.size())
+        # print('message', message)
+        # print('message size', message.size())
 
         # two hidden vectors ν[uv] and ν[vu] denoting
         # the message from u to v and vice versa
-        for i in range(self.depth - 1):
+        for i in range(self.depth - 1): # belief propagation happens here, each node aggregate info from its neighbors
             nei_message = index_select_ND(message, 0, bgraph) # bgraph index by bonds (0-1) -> [0, 35, 44, 0, 0, 0]
             # print('nei_message', nei_message)
             # print('nei_message size', nei_message.size())

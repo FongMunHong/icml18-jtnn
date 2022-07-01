@@ -100,7 +100,8 @@ class MolTree(object):
             node = MolTreeNode(get_smiles(cmol), c)
             self.nodes.append(node)
             if min(c) == 0:
-                root = i
+                root = i # the root is the MolTreeNode [0, 1] that contains the idx 0
+                # node that contains atom 0 will be root
 
         for x,y in edges:
             self.nodes[x].add_neighbor(self.nodes[y])

@@ -53,8 +53,7 @@ class JTNNVAE(nn.Module):
         # which means there will if batch size 40
         # we have 40 trees, with their root all together
         root_batch = [mol_tree.nodes[0] for mol_tree in mol_batch]           
-        # tree_mess,tree_vec = self.jtnn(root_batch)
-        tree_mess, tree_vec = [], []
+        tree_mess,tree_vec = self.jtnn(root_batch)
 
         smiles_batch = [mol_tree.smiles for mol_tree in mol_batch]
         mol_vec = self.mpn(mol2graph(smiles_batch))
@@ -75,8 +74,12 @@ class JTNNVAE(nn.Module):
 
         tree_mess, tree_vec, mol_vec = self.encode(mol_batch)
 
+
+        # print('tree_vec', tree_vec.tolist())
         tree_mean = self.T_mean(tree_vec)
-        tree_log_var = -torch.abs(self.T_var(tree_vec)) #Following Mueller et al.
+        tree_log_var = -torch.abs(self.T_var(tree_vec)) #Following Mueller et al. # doing this so that variance will be restricted <= 1
+        # print('tree_log_var', tree_log_var.tolist())
+        # print('val', torch.exp(tree_log_var / 2).tolist())
         mol_mean = self.G_mean(mol_vec)
         mol_log_var = -torch.abs(self.G_var(mol_vec)) #Following Mueller et al.
 
@@ -90,6 +93,7 @@ class JTNNVAE(nn.Module):
         mol_vec = mol_mean + torch.exp(mol_log_var / 2) * epsilon
         
         word_loss, topo_loss, word_acc, topo_acc = self.decoder(mol_batch, tree_vec)
+        
         assm_loss, assm_acc = self.assm(mol_batch, mol_vec, tree_mess)
         if self.use_stereo:
             stereo_loss, stereo_acc = self.stereo(mol_batch, mol_vec)
