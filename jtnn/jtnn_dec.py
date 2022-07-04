@@ -58,22 +58,23 @@ class JTNNDecoder(nn.Module):
         traces = []
         for mol_tree in mol_batch:
             s = []
-            dfs(s, mol_tree.nodes[0], super_root)
+            dfs(s, mol_tree.nodes[0], super_root) # inorder traversal
 
-            # s_wid = [[node.wid if 'recover' in dir(node) else node for node in clique] for clique in s]
+            # print(mol_tree.nodes[0].idx)
+            # # s_wid = [[node.wid if 'recover' in dir(node) else node for node in clique] for clique in s]
             # s_idx = [[node.idx if 'recover' in dir(node) else node for node in clique] for clique in s]
-            # print(s_wid)
-            # print()
+            # s_nei_idx = [node.idx for node in mol_tree.nodes[0].neighbors]
             # print(s_idx)
+            # # print(s_wid)
+            # print(s_nei_idx)
+            # print()
 
             traces.append(s)
             for node in mol_tree.nodes:
                 node.neighbors = [] # reset neighbors
 
-
-        # print('mol_batch size', len(mol_batch)) # 40 size
         #Predict Root
-        pred_hiddens.append(create_var(torch.zeros(len(mol_batch),self.hidden_size))) # 40 x 450
+        pred_hiddens.append(create_var(torch.zeros(len(mol_batch), self.hidden_size))) # 40 x 450
         pred_targets.extend([mol_tree.nodes[0].wid for mol_tree in mol_batch]) # length 40
         pred_mol_vecs.append(mol_vec) # mol_vec is the vector after GRU and message passing on junction tree [[40, 450]]
 
@@ -96,7 +97,7 @@ class JTNNDecoder(nn.Module):
 
             for node_x,real_y,_ in prop_list: # [MolTreeNode1, MolTreeNode2, 1 or 0]
                 #Neighbors for message passing (target not included)
-                # get message of neighbors of all node_x except direct neighbor y specified by edge (x, y)
+                # get message of neighbors of all node_x except for traversal edge specified in traversal
                 cur_nei = [h[(node_y.idx,node_x.idx)] for node_y in node_x.neighbors if node_y.idx != real_y.idx] # empty on first iteration
                 pad_len = MAX_NB - len(cur_nei)
                 cur_h_nei.extend(cur_nei)
@@ -128,7 +129,7 @@ class JTNNDecoder(nn.Module):
             #Node Aggregate
             cur_o_nei = torch.stack(cur_o_nei, dim=0).view(-1,MAX_NB,self.hidden_size) # 320 x 450 -> 40 x 8 x 450
             cur_o = cur_o_nei.sum(dim=1)
-            # print(cur_o.size()) # 320 x 450
+            # print(cur_o.size()) # 40 x 450 (sum of all neighbors)
 
             #Gather targets
             pred_target,pred_list = [],[]
@@ -145,43 +146,51 @@ class JTNNDecoder(nn.Module):
 
             # print('pred_target', pred_target) # [523, 521, 469, 343, 516, 515, 469, 517, 515, 515, 469, 469, 515, 469, 523, 469, 515, 515, 213, 469, 213, 479, 469, 515, 250, 449, 515, 469, 469, 517, 213, 469, 469, 482, 188, 726, 515, 469, 515, 515]
             # print('pred_list', pred_list) # [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39]
-            # print('stop_target', stop_target) # [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+            # print('stop_target', stop_target) # [0, 1, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0] shrinks as iteration goes since not all trees same length
 
             #Hidden states for stop prediction
             # print(batch_list) # [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39]
-            cur_batch = create_var(torch.LongTensor(batch_list))
-            cur_mol_vec = mol_vec.index_select(0, cur_batch) # mol_vec is the vector after GRU and message passing on junction tree [[40, 450]]
+            cur_batch = create_var(torch.LongTensor(batch_list)) # batch_list == cur_batch
+            cur_mol_vec = mol_vec.index_select(0, cur_batch) # mol_vec is the vector after GRU and message passing on junction tree [[40, 28 (latent embedding dimension)]]
+            # cur_batch == batch_list
 
-            # print(cur_x.size())
-            # print(cur_o.size())
-            # print(cur_batch.size())
-            # print(cur_mol_vec.size())
-            # print(mol_vec)
-            # print(mol_vec.size())
-            # print()
+            # print(cur_x.size()) # 40 x 450 # target node embedding
+            # print(cur_o.size()) # 40 x 450 # message from neighbors of target node
+            # print(cur_batch.size()) # <40 depends on traces 
+            # print(cur_mol_vec.size()) # <40 depends on traces x 28 # from latent embedding
+            # print(mol_vec.size()) # 40 x 28 
 
             stop_hidden = torch.cat([cur_x,cur_o,cur_mol_vec], dim=1) # cur_x - embedding of nodes, cur_o - message from neighbors, # predicted message vector from encoder 
-            # 40 x 928 [450 + 450 + 28(became small after sampling)] stop_hidden
+            # 40 x 928 [450 + 450 + 28(became small after sampling)] (stop_hidden size)
             # print(stop_hidden.size())
             stop_hiddens.append( stop_hidden )
             stop_targets.extend( stop_target )
             # print(stop_targets)
-            # raise
             
-            #Hidden states for clique prediction
-            if len(pred_list) > 0:
-                batch_list = [batch_list[i] for i in pred_list]
-                cur_batch = create_var(torch.LongTensor(batch_list))
-                pred_mol_vecs.append( mol_vec.index_select(0, cur_batch) )
+            # print([ml.size()[0] for ml in pred_mol_vecs])
 
+            #Hidden states for clique prediction
+            if len(pred_list) > 0: # pred_list is collection of (direction 1) node index 
+                # print(pred_list)
+                # print(batch_list)
+                # print()
+
+                batch_list = [batch_list[i] for i in pred_list]
+                # print([[node.idx if 'recover' in dir(node) else node for node in prop_list[index]] for index in pred_list]) # edge traversal with direction 1
+                
+                cur_batch = create_var(torch.LongTensor(batch_list))
+                pred_mol_vecs.append( mol_vec.index_select(0, cur_batch) ) # mol_vec.index_select(0, cur_batch) - select cur_batch indexes out of 40 nodes of latent representation
+                # single pred_mol_vec - size (cur_batch_size x 28)
                 cur_pred = create_var(torch.LongTensor(pred_list))
                 pred_hiddens.append( new_h.index_select(0, cur_pred) )
+                # single pred_hidden - size (cur_pred_size x 450)
                 pred_targets.extend( pred_target )
+
 
         #Last stop at root
         cur_x,cur_o_nei = [],[]
         for mol_tree in mol_batch:
-            node_x = mol_tree.nodes[0]
+            node_x = mol_tree.nodes[0] # get root
             cur_x.append(node_x.wid)
             cur_nei = [h[(node_y.idx,node_x.idx)] for node_y in node_x.neighbors]
             pad_len = MAX_NB - len(cur_nei)
@@ -198,29 +207,45 @@ class JTNNDecoder(nn.Module):
         stop_targets.extend( [0] * len(mol_batch) )
 
         #Predict next clique
-        pred_hiddens = torch.cat(pred_hiddens, dim=0)
-        pred_mol_vecs = torch.cat(pred_mol_vecs, dim=0)
-        pred_vecs = torch.cat([pred_hiddens, pred_mol_vecs], dim=1)
-        pred_vecs = nn.ReLU()(self.W(pred_vecs))
-        pred_scores = self.W_o(pred_vecs)
-        pred_targets = create_var(torch.LongTensor(pred_targets))
+        pred_hiddens = torch.cat(pred_hiddens, dim=0) # 546 x 450[neighboring messages]
+        pred_mol_vecs = torch.cat(pred_mol_vecs, dim=0) # 546 x 28[latent embeddings]
 
+        pred_vecs = torch.cat([pred_hiddens, pred_mol_vecs], dim=1) # 546 (count of nodes which has direction 1) x [28(latent_size) from mean + 450(hidden_size)]
+        pred_vecs = nn.ReLU()(self.W(pred_vecs)) # [546 x 478] (.) [478 x 784(vocab_size)]
+        pred_scores = self.W_o(pred_vecs) # 546 x 784
+        # [-0.0710, -0.0961, -0.1732,  ...,  0.2573,  0.0975,  0.0056] - pred_scores
+        pred_targets = create_var(torch.LongTensor(pred_targets)) # 546
+        # [523, 521, 469, 343, 516, 515, 469] - pred_targets
+
+        # print(pred_scores.size())
+        # print(pred_targets.size())  
+
+        # https://blog.csdn.net/geter_CS/article/details/84857220
         pred_loss = self.pred_loss(pred_scores, pred_targets) / len(mol_batch)
-        _,preds = torch.max(pred_scores, dim=1)
-        pred_acc = torch.eq(preds, pred_targets).float()
-        pred_acc = torch.sum(pred_acc) / pred_targets.nelement()
+        _,preds = torch.max(pred_scores, dim=1) # _ stores actual value, # preds store index of max value
+        pred_acc = torch.eq(preds, pred_targets).float() # 0 - 784 vs 0 - 784 see if prediction is correct 
+        pred_acc = torch.sum(pred_acc) / pred_targets.nelement() # sum of true and false / how many elements
 
         #Predict stop
-        stop_hiddens = torch.cat(stop_hiddens, dim=0)
-        stop_vecs = nn.ReLU()(self.U(stop_hiddens))
-        stop_scores = self.U_s(stop_vecs).squeeze()
-        stop_targets = create_var(torch.Tensor(stop_targets))
+        # stop hiddens [1142(for loop nodes[varies based on tree traversal]) + 40(root))] x 928 
+        stop_hiddens = torch.cat(stop_hiddens, dim=0) # compilation of batch list, total number of edge traversal (traces) x 928 [450 + 450 + 28]
+        stop_vecs = nn.ReLU()(self.U(stop_hiddens)) # [1182 x 928] . [928 x 450] = 1182 x 450
         
-        stop_loss = self.stop_loss(stop_scores, stop_targets) / len(mol_batch)
-        stops = torch.ge(stop_scores, 0).float()
-        stop_acc = torch.eq(stops, stop_targets).float()
-        stop_acc = torch.sum(stop_acc) / stop_targets.nelement()
+        # self.U_s(stop_vecs) [1182 x 450] . [450 x 1] = [1182 x 1]
+        stop_scores = self.U_s(stop_vecs).squeeze() # [1182] - squeeze
+        # stop scores = [0.0033, 0.2251, 0.0212,  ..., 0.1151, 0.1266, 0.2288]
+        stop_targets = create_var(torch.Tensor(stop_targets))
+        # stop_targets = [1., 1., 1.,  ..., 0., 0., 0.] direction prediction
 
+        # print(stop_scores.size())
+        # print(stop_targets.size())
+        # print(len(mol_batch))
+        stop_loss = self.stop_loss(stop_scores, stop_targets) / len(mol_batch) # sigmoid + BCE loss # 778.29 / 40 
+        stops = torch.ge(stop_scores, 0).float() # stop scores greater than 0
+        stop_acc = torch.eq(stops, stop_targets).float() # true/false compare with stop targets
+        stop_acc = torch.sum(stop_acc) / stop_targets.nelement() # stop accuracy
+
+        # tensors -> number [.item()]
         return pred_loss, stop_loss, pred_acc.item(), stop_acc.item()
     
     def decode(self, mol_vec, prob_decode):
