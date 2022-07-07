@@ -93,7 +93,7 @@ class JTNNVAE(nn.Module):
         mol_vec = mol_mean + torch.exp(mol_log_var / 2) * epsilon
         
         word_loss, topo_loss, word_acc, topo_acc = self.decoder(mol_batch, tree_vec)
-        
+
         assm_loss, assm_acc = self.assm(mol_batch, mol_vec, tree_mess)
         if self.use_stereo:
             stereo_loss, stereo_acc = self.stereo(mol_batch, mol_vec)
@@ -107,12 +107,17 @@ class JTNNVAE(nn.Module):
 
     def assm(self, mol_batch, mol_vec, tree_mess):
         cands = []
-        batch_idx = []
+        batch_idx = []        
         for i,mol_tree in enumerate(mol_batch):
             for node in mol_tree.nodes:
                 #Leaf node's attachment is determined by neighboring node's attachment
                 if node.is_leaf or len(node.cands) == 1: continue
                 cands.extend( [(cand, mol_tree.nodes, node) for cand in node.cand_mols] )
+
+                print(mol_tree.smiles)
+                print(node.smiles)
+                print([Chem.MolToSmiles(cand) for cand in node.cand_mols])
+
                 batch_idx.extend([i] * len(node.cands))
 
         cand_vec = self.jtmpn(cands, tree_mess)

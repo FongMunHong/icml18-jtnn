@@ -62,9 +62,19 @@ for epoch in range(MAX_EPOCH):
 
     word_acc,topo_acc,assm_acc,steo_acc = 0,0,0,0
 
+    # node.neighbors.smiles & node.smiles will contribute
+    # to node.cands formation, where there will enumerate all possibilities of them being assembled
     for it, batch in enumerate(dataloader):
         for mol_tree in batch:
             for node in mol_tree.nodes:
+                # print()
+                # print(mol_tree.smiles)
+                # print(node.smiles)
+                # print([nei.smiles for nei in node.neighbors]) # from recover
+                # print()
+                # print(node.label)
+                # for cands in node.cands: print(cands, end=", ")
+                # print('\n')
                 if node.label not in node.cands:
                     node.cands.append(node.label)
                     node.cand_mols.append(node.label_mol)

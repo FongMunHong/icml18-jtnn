@@ -14,8 +14,8 @@ class MoleculeDataset(Dataset):
     def __getitem__(self, idx):
         smiles = self.data[idx]
         mol_tree = MolTree(smiles)
-        mol_tree.recover()
-        mol_tree.assemble()
+        mol_tree.recover() # recover tree from nodes?
+        mol_tree.assemble() # enum_assemble for all nodes
         return mol_tree
 
 class PropDataset(Dataset):

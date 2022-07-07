@@ -71,11 +71,20 @@ class MolTreeNode(object):
         singletons = [nei for nei in self.neighbors if nei.mol.GetNumAtoms() == 1]
         neighbors = singletons + neighbors
 
-        cands = enum_assemble(self, neighbors)
+        # print('node smiles', self.smiles) # the smiles node itself
+
+        # print("neigh smiles", [nei.smiles for nei in self.neighbors]) # from recover
+        # print("neigh label", [nei.label for nei in self.neighbors]) # from recover
+
+        cands = enum_assemble(self, neighbors) # possible attachment candidates through enumerating subgraphs
+
         if len(cands) > 0:
             self.cands, self.cand_mols, _ = zip(*cands)
             self.cands = list(self.cands)
             self.cand_mols = list(self.cand_mols)
+
+            # print("cands", self.cands)
+            # print()
         else:
             self.cands = []
             self.cand_mols = []
@@ -125,6 +134,7 @@ class MolTree(object):
 
     def assemble(self):
         for node in self.nodes:
+            # print('tree smiles', self.smiles)
             node.assemble()
 
 if __name__ == "__main__":

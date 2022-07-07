@@ -71,7 +71,7 @@ class JTNNDecoder(nn.Module):
 
             traces.append(s)
             for node in mol_tree.nodes:
-                node.neighbors = [] # reset neighbors
+                node.neighbors = [] # reset neighbors / teacher forcing
 
         #Predict Root
         pred_hiddens.append(create_var(torch.zeros(len(mol_batch), self.hidden_size))) # 40 x 450
@@ -98,7 +98,7 @@ class JTNNDecoder(nn.Module):
             for node_x,real_y,_ in prop_list: # [MolTreeNode1, MolTreeNode2, 1 or 0]
                 #Neighbors for message passing (target not included)
                 # get message of neighbors of all node_x except for traversal edge specified in traversal
-                cur_nei = [h[(node_y.idx,node_x.idx)] for node_y in node_x.neighbors if node_y.idx != real_y.idx] # empty on first iteration
+                cur_nei = [h[(node_y.idx,node_x.idx)] for node_y in node_x.neighbors if node_y.idx != real_y.idx] # empty on first couple iteration then will start populating / teacher forcing in play
                 pad_len = MAX_NB - len(cur_nei)
                 cur_h_nei.extend(cur_nei)
                 cur_h_nei.extend([padding] * pad_len)
@@ -138,7 +138,7 @@ class JTNNDecoder(nn.Module):
                 node_x,node_y,direction = m
                 x,y = node_x.idx,node_y.idx
                 h[(x,y)] = new_h[i]
-                node_y.neighbors.append(node_x)
+                node_y.neighbors.append(node_x) # teacher forcing should be here?
                 if direction == 1: # top down = 1, bottom up = 0, might be otherwise
                     pred_target.append(node_y.wid)
                     pred_list.append(i) # top down edge traversal list [MolTreeNode1, MolTreeNode2, 1], [MolTreeNode3, MolTreeNode4, 1]
