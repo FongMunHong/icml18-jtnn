@@ -109,21 +109,22 @@ class JTNNVAE(nn.Module):
         cands = []
         batch_idx = []        
         for i,mol_tree in enumerate(mol_batch):
+            # print(mol_tree.smiles)
+            # print([ Chem.MolToSmiles(cand) for cand in mol_tree.nodes[0].cand_mols ])
             for node in mol_tree.nodes:
                 #Leaf node's attachment is determined by neighboring node's attachment
                 if node.is_leaf or len(node.cands) == 1: continue
                 cands.extend( [(cand, mol_tree.nodes, node) for cand in node.cand_mols] )
-
-                print(mol_tree.smiles)
-                print(node.smiles)
-                print([Chem.MolToSmiles(cand) for cand in node.cand_mols])
-
-                batch_idx.extend([i] * len(node.cands))
+                batch_idx.extend([i] * len(node.cands)) # count the number of candidates for a node?
 
         cand_vec = self.jtmpn(cands, tree_mess)
         cand_vec = self.G_mean(cand_vec)
 
         batch_idx = create_var(torch.LongTensor(batch_idx))
+        # print(batch_idx.tolist())
+        
+        # print(batch_idx.size())
+        # raise
         mol_vec = mol_vec.index_select(0, batch_idx)
 
         mol_vec = mol_vec.view(-1, 1, int(self.latent_size / 2))

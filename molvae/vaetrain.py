@@ -9,6 +9,9 @@ import math, random, sys
 from optparse import OptionParser
 from collections import deque
 
+sys.path.append('../')
+sys.path.append('../jtnn')
+
 from jtnn import *
 import rdkit
 

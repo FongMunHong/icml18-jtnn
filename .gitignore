@@ -1,3 +1,5 @@
 *.pyc
 processed/
 molvae/run*
+molvae/pre_model*
+molvae/vae_model*

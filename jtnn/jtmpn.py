@@ -46,42 +46,88 @@ class JTMPN(nn.Module):
         total_atoms = 0
         scope = []
 
+        # tree message + candidate subgraph message
+        # -------------------------------------------
+        
+        # print(len(tree_mess))
+
         # for e,vec in tree_mess.iteritems():
+        # tree message saves embeddings for each edges, 
+        # thus len of tree message corresponds to the number of edge traversals
+        # total = []
         for e,vec in tree_mess.items():
-            mess_dict[e] = len(all_mess)
+            mess_dict[e] = len(all_mess) # mess_dict increments along the number of tree message
             all_mess.append(vec)
+            # print(e, end="")
+            # total.extend(list(e))
+
+        # print(min(total)) # 0
+        # print(max(total)) # depends on the last node of 40 trees being indexed
+        # print(len(all_mess)) # depends on the number of traversals in total of the 40 trees
 
         for mol,all_nodes,ctr_node in cand_batch:
+            # how they prepare the subgraph molecule with their respective index is important
+            # because used here (enum_assemble)
+
+            # mol - candidate subgraph generated 
+            #       with neighbor of ctr_node and ctr_node
+
+            # all_nodes - all nodes in that tree
             n_atoms = mol.GetNumAtoms()
             ctr_bid = ctr_node.idx
 
+            # mol2 = Chem.Mol(mol)
+            # for atom in mol2.GetAtoms():
+            #     atom.SetProp('molAtomMapNumber', str(atom.GetIdx()))
+            # print(Chem.MolToSmiles(mol2))
+            # print(Chem.MolToSmiles(ctr_node.mol))
+            # print(Chem.MolToSmiles(mol))
+
             for atom in mol.GetAtoms():
                 fatoms.append( atom_features(atom) )
-                in_bonds.append([]) 
+                in_bonds.append([]) # in_bonds for that specific atom
         
             for bond in mol.GetBonds():
                 a1 = bond.GetBeginAtom()
                 a2 = bond.GetEndAtom()
                 x = a1.GetIdx() + total_atoms
-                y = a2.GetIdx() + total_atoms
+                y = a2.GetIdx() + total_atoms # get actual index, won't change despite of mapping
+
+                # print('x, y', x, y)
                 #Here x_nid,y_nid could be 0
-                x_nid,y_nid = a1.GetAtomMapNum(),a2.GetAtomMapNum()
+                x_nid,y_nid = a1.GetAtomMapNum(),a2.GetAtomMapNum() # based on mapping
+                # print(x_nid, y_nid) # x_nid and b_nid is a product of enum_assemble, 
+                # in which the whole fragment will be named the same number, 
+                # thus the same number for both will refer being in the same MolTreeNode
                 x_bid = all_nodes[x_nid - 1].idx if x_nid > 0 else -1
                 y_bid = all_nodes[y_nid - 1].idx if y_nid > 0 else -1
-
+                # print(x_bid, y_bid)
                 bfeature = bond_features(bond)
+                # print(bfeature)
 
                 b = len(all_mess) + len(all_bonds)  #bond idx offseted by len(all_mess)
+                # print(len(all_mess),  len(all_bonds))
                 all_bonds.append((x,y))
+                # fatoms[x] to access one hot encoding of that atom
+                # bfeature - bondtype + stereo prop one hot encoding
                 fbonds.append( torch.cat([fatoms[x], bfeature], 0) )
                 in_bonds[y].append(b)
+
+                # print(in_bonds[y], y, b)
 
                 b = len(all_mess) + len(all_bonds)
                 all_bonds.append((y,x))
                 fbonds.append( torch.cat([fatoms[y], bfeature], 0) )
                 in_bonds[x].append(b)
 
-                if x_bid >= 0 and y_bid >= 0 and x_bid != y_bid:
+                # print(in_bonds[x], x, b)
+                # print()
+
+                if x_bid >= 0 and y_bid >= 0 and x_bid != y_bid: 
+                    # if this two index on the candidate subgraph doesn't belong to the same MolTreeNode
+                    # print('x_nid, y_nid', x_nid, y_nid) # idx on candidate subgraph - will show they don't belong to the same fragment
+                    # print('x_bid, y_bid', x_bid, y_bid) # idx on molTree itself
+
                     if (x_bid,y_bid) in mess_dict:
                         mess_idx = mess_dict[(x_bid,y_bid)]
                         in_bonds[y].append(mess_idx)
@@ -91,6 +137,7 @@ class JTMPN(nn.Module):
             
             scope.append((total_atoms,n_atoms))
             total_atoms += n_atoms
+
         
         total_bonds = len(all_bonds)
         total_mess = len(all_mess)
@@ -103,6 +150,9 @@ class JTMPN(nn.Module):
         for a in range(total_atoms):
             for i,b in enumerate(in_bonds[a]):
                 agraph[a,i] = b
+
+        print(agraph[:5])
+        raise
 
         for b1 in range(total_bonds):
             x,y = all_bonds[b1]
