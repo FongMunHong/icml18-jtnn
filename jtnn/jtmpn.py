@@ -149,16 +149,35 @@ class JTMPN(nn.Module):
 
         for a in range(total_atoms):
             for i,b in enumerate(in_bonds[a]):
-                agraph[a,i] = b
+                agraph[a,i] = b # a refers to the bond index, i index refers to the values that needs to be filled up
+                # [1072,    0,    0,    0,    0,    0,    0,    0,    0,    0], row value a = 0 (atom idx out of all 40 trees)
+                #    i ,    i+1,  i+2,  i+3,
+                # [1071, 1074, 1076,  456,    0,    0,    0,    0,    0,    0], row value a = 1 (atom idx out of all 40 trees)
+                # print('atom_index', a, 'index on agraph to update', i, 'index of in_bonds that are associated to atom index a', b)
+            # if a > 10: raise
 
-        print(agraph[:5])
-        raise
 
         for b1 in range(total_bonds):
             x,y = all_bonds[b1]
             for i,b2 in enumerate(in_bonds[x]): #b2 is offseted by len(all_mess)
                 if b2 < total_mess or all_bonds[b2-total_mess][0] != y:
                     bgraph[b1,i] = b2
+                    # print(b1, i, '+++', x, y) bonds associated for update
+            # if b1 > 10: raise
+
+        
+        # print(agraph[:5])
+        # tensor([[1072,    0,    0,    0,    0,    0,    0,    0,    0,    0],  -> 0 (atom_idx)
+        #         [1071, 1074, 1076,  456,    0,    0,    0,    0,    0,    0],  -> 1
+        #         [1073,    0,    0,    0,    0,    0,    0,    0,    0,    0],  -> 2
+        #         [1075,  608,    0,    0,    0,    0,    0,    0,    0,    0],  -> 3
+        #         [1078,    0,    0,    0,    0,    0,    0,    0,    0,    0]]) -> 4
+        # print(bgraph[:5]) - each row corresponds to one bond, ignore first row, 0-1, 1-0, 0-2
+        # tensor([[   0,    0,    0,    0,    0,    0,    0,    0,    0,    0],
+        #         [   0, 1074, 1076,  456,    0,    0,    0,    0,    0,    0],  -> 0-1
+        #         [1071,    0, 1076,  456,    0,    0,    0,    0,    0,    0],  -> 1-0
+        #         [   0,    0,    0,    0,    0,    0,    0,    0,    0,    0],  -> 1-2
+        #         [1071, 1074,    0,  456,    0,    0,    0,    0,    0,    0]]) -> 1-3
 
         fatoms = create_var(fatoms)
         fbonds = create_var(fbonds)
@@ -169,7 +188,7 @@ class JTMPN(nn.Module):
         graph_message = nn.ReLU()(binput)
 
         for i in range(self.depth - 1):
-            message = torch.cat([tree_message,graph_message], dim=0)
+            message = torch.cat([tree_message,graph_message], dim=0) # size 28349, 450
             nei_message = index_select_ND(message, 0, bgraph)
             nei_message = nei_message.sum(dim=1)
             nei_message = self.W_h(nei_message)
@@ -183,9 +202,11 @@ class JTMPN(nn.Module):
         
         mol_vecs = []
         for st,le in scope:
+            # scope.append((total_atoms,n_atoms))
             mol_vec = atom_hiddens.narrow(0, st, le).sum(dim=0) / le
             mol_vecs.append(mol_vec)
 
-        mol_vecs = torch.stack(mol_vecs, dim=0)
+        mol_vecs = torch.stack(mol_vecs, dim=0) # torch.Size([1341 (len cand batch), 450])
+        # print(len(cand_batch), mol_vecs.size())
         return mol_vecs
 
