@@ -77,9 +77,6 @@ for epoch in xrange(MAX_EPOCH):
         # print "loss", loss
         # print "\n"
 
-        raise 
-
-
         loss.backward()
         optimizer.step()
 

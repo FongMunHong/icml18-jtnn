@@ -73,8 +73,6 @@ class JTNNVAE(nn.Module):
 
         tree_mess,tree_vec = self.jtnn(root_batch)
 
-        raise
-
         smiles_batch = [mol_tree.smiles for mol_tree in mol_batch]
         mol_vec = self.mpn(mol2graph(smiles_batch))
         return tree_mess, tree_vec, mol_vec

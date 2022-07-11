@@ -37,9 +37,9 @@ class JTNNEncoder(nn.Module):
         h = {}
         max_depth = max([len(x) for x in orders])
         padding = create_var(torch.zeros(self.hidden_size), False)
-        print('padding', padding)
+        # print('padding', padding)
 
-        print('max_depth', max_depth)
+        # print('max_depth', max_depth)
 
         for t in xrange(max_depth):
             prop_list = []
@@ -71,21 +71,21 @@ class JTNNEncoder(nn.Module):
             # retrieved using embedding(cur_x)
 
             # h_nei and cur_h_nei hello
-            print('cur_x', cur_x)
+            # print('cur_x', cur_x)
             # print('len h_nei', len(h_nei))
             # print('cur_h_nei', cur_h_nei)
 
             cur_x = create_var(torch.LongTensor(cur_x))
             cur_x = self.embedding(cur_x)
-            print('embedding cur_x', cur_x)
+            # print('embedding cur_x', cur_x)
             
-            print('cur_h_nei 1 size', len(cur_h_nei), cur_h_nei[0].size())
+            # print('cur_h_nei 1 size', len(cur_h_nei), cur_h_nei[0].size())
 
             # view makes the tensor to look like 60, 8, 450
             cur_h_nei = torch.cat(cur_h_nei, dim=0).view(-1,MAX_NB,self.hidden_size)
 
-            print('cur_h_nei 2 size', cur_h_nei.size())
-            print('cur_x size', cur_x.size())
+            # print('cur_h_nei 2 size', cur_h_nei.size())
+            # print('cur_x size', cur_x.size())
 
             new_h = GRU(cur_x, cur_h_nei, self.W_z, self.W_r, self.U_r, self.W_h)
             for i,m in enumerate(prop_list):
@@ -98,9 +98,8 @@ class JTNNEncoder(nn.Module):
 
         # h stores edges? pairs of index of MolTreeNode (fragements)
         # values is the GRU learned candidate embedding
-        print('h map', h.keys())
-        print('h map', h.values()[0])
-        raise
+        # print('h map', h.keys())
+        # print('h map', h.values()[0])
 
         root_vecs = node_aggregate(root_batch, h, self.embedding, self.W)
 
@@ -143,7 +142,7 @@ def node_aggregate(nodes, h, embedding, W):
         nei.extend([padding] * pad_len)
         h_nei.extend(nei)
     
-    print(x_idx)
+    # print(x_idx)
 
     h_nei = torch.cat(h_nei, dim=0).view(-1,MAX_NB,hidden_size)
     sum_h_nei = h_nei.sum(dim=1)
