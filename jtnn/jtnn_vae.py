@@ -115,38 +115,50 @@ class JTNNVAE(nn.Module):
                 #Leaf node's attachment is determined by neighboring node's attachment
                 if node.is_leaf or len(node.cands) == 1: continue
                 cands.extend( [(cand, mol_tree.nodes, node) for cand in node.cand_mols] )
+                # print([i] * len(node.cands))
+                # [0, 0, 0, 0, 0, 0, 0, 0, 0]
+                # [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                # [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+                # [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
                 batch_idx.extend([i] * len(node.cands)) # count the number of candidates for a node?
+
 
         cand_vec = self.jtmpn(cands, tree_mess)
         cand_vec = self.G_mean(cand_vec)
 
         batch_idx = create_var(torch.LongTensor(batch_idx))
-        # print(batch_idx.tolist())
-        
-        # print(batch_idx.size())
-        # raise
         mol_vec = mol_vec.index_select(0, batch_idx)
+        # print(mol_vec.size()) # torch.Size([1527, 28 (latent embedding size)])
 
         mol_vec = mol_vec.view(-1, 1, int(self.latent_size / 2))
         cand_vec = cand_vec.view(-1, int(self.latent_size / 2), 1)
-        scores = torch.bmm(mol_vec, cand_vec).squeeze()
+        # print(mol_vec.size()) # torch.Size([1527, 1, 28])
+        # print(cand_vec.size()) # torch.Size([1527, 1, 28])
+
+        # [1527, 1, 28] x(bmm) [1527, 28, 1] == [1527, 1, 1] -(squeeze)-> [1527]
+        scores = torch.bmm(mol_vec, cand_vec).squeeze() 
+        # tensor([-0.5511, -0.5580, -0.3871,  ...,  0.3820,  0.3339,  0.2747],
         
         cnt,tot,acc = 0,0,0
         all_loss = []
         for i,mol_tree in enumerate(mol_batch):
-            comp_nodes = [node for node in mol_tree.nodes if len(node.cands) > 1 and not node.is_leaf]
+            comp_nodes = [node for node in mol_tree.nodes if len(node.cands) > 1 and not node.is_leaf] # same as node.is_leaf or len(node.cands) == 1 (DE MORGAN)
             cnt += len(comp_nodes)
             for node in comp_nodes:
-                label = node.cands.index(node.label)
+                label = node.cands.index(node.label) # node.cands = ['[c:3]1([CH3:14])[cH:11][n:11][cH:11][n:11][cH:11]1', '[c:3]1([CH3:14])[cH:11][cH:11][n:11][cH:11][n:11]1', '[c:3]1([CH3:14])[n:11][cH:11][cH:11][cH:11][n:11]1']
                 ncand = len(node.cands)
-                cur_score = scores.narrow(0, tot, ncand)
+                cur_score = scores.narrow(0, tot, ncand) # select scores of all candidates on that label
                 tot += ncand
 
-                if cur_score[label].item() >= cur_score.max().item():
-                    acc += 1
+                # print(cur_score[label].item(), cur_score.max().item())
+                # if label == index have the highest probability on the cur_score array, which means softmax has successfully predicted the right label across all indexes
+                if cur_score[label].item() >= cur_score.max().item(): 
+                    acc += 1 
 
                 label = create_var(torch.LongTensor([label]))
-                all_loss.append( self.assm_loss(cur_score.view(1,-1), label) )
+                print(cur_score.view(1,-1).tolist(), label.item())
+                print()
+                all_loss.append( self.assm_loss(cur_score.view(1,-1), label) ) # assm_loss -> softmax loss in reality, label is the index on cur_score which is target value
         
         #all_loss = torch.stack(all_loss).sum() / len(mol_batch)
         all_loss = sum(all_loss) / len(mol_batch)

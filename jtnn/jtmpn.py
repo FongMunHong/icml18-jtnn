@@ -188,6 +188,11 @@ class JTMPN(nn.Module):
         graph_message = nn.ReLU()(binput)
 
         for i in range(self.depth - 1):
+            # print(tree_message) # compilation of all traversals vector/embedding into one matrix
+            # print(graph_message) # compilation of all possible candidates and their correponding trees
+            # print(len(tree_mess)) # dictionary of all traversals
+            # print(tree_message.size()) # torch.Size([1133, 450]) 
+            # print(graph_message.size()) # torch.Size([26242, 450])
             message = torch.cat([tree_message,graph_message], dim=0) # size 28349, 450
             nei_message = index_select_ND(message, 0, bgraph)
             nei_message = nei_message.sum(dim=1)
