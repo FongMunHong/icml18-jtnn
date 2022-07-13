@@ -60,6 +60,9 @@ class MolTreeNode(object):
         self.label = Chem.MolToSmiles(Chem.MolFromSmiles(get_smiles(label_mol)))
         self.label_mol = get_mol(self.label)
 
+        # self.label means the correct assemble label of that moltreeNode, 
+        # take it's neighbors arrangement into account
+
         for cidx in clique:
             original_mol.GetAtomWithIdx(cidx).SetAtomMapNum(0)
 

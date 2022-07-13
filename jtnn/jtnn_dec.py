@@ -248,13 +248,15 @@ class JTNNDecoder(nn.Module):
         # tensors -> number [.item()]
         return pred_loss, stop_loss, pred_acc.item(), stop_acc.item()
     
-    def decode(self, mol_vec, prob_decode):
+    def decode(self, mol_vec, prob_decode): # molvec refers to tree_vec from draw_nei
         stack,trace = [],[]
         init_hidden = create_var(torch.zeros(1,self.hidden_size))
         zero_pad = create_var(torch.zeros(1,1,self.hidden_size))
 
         #Root Prediction
         root_hidden = torch.cat([init_hidden, mol_vec], dim=1)
+        print(root_hidden.size())
+        raise
         root_hidden = nn.ReLU()(self.W(root_hidden))
         root_score = self.W_o(root_hidden)
         _,root_wid = torch.max(root_score, dim=1)

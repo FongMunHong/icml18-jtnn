@@ -65,9 +65,9 @@ class JTNNVAE(nn.Module):
             mol_tree.recover()
 
         _, tree_vec, mol_vec = self.encode(mol_batch)
-        tree_mean = self.T_mean(tree_vec)
-        mol_mean = self.G_mean(mol_vec)
-        return torch.cat([tree_mean,mol_mean], dim=1)
+        tree_mean = self.T_mean(tree_vec) # [numb of smiles x 28]
+        mol_mean = self.G_mean(mol_vec)   # [numb of smiles x 28]
+        return torch.cat([tree_mean,mol_mean], dim=1) # [numb of smiles, 56]
 
     def forward(self, mol_batch, beta=0):
         batch_size = len(mol_batch)
@@ -114,7 +114,7 @@ class JTNNVAE(nn.Module):
             for node in mol_tree.nodes:
                 #Leaf node's attachment is determined by neighboring node's attachment
                 if node.is_leaf or len(node.cands) == 1: continue
-                cands.extend( [(cand, mol_tree.nodes, node) for cand in node.cand_mols] )
+                cands.extend( [(cand, mol_tree.nodes, node, mol_tree) for cand in node.cand_mols] )
                 # print([i] * len(node.cands))
                 # [0, 0, 0, 0, 0, 0, 0, 0, 0]
                 # [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -136,7 +136,7 @@ class JTNNVAE(nn.Module):
         # print(cand_vec.size()) # torch.Size([1527, 1, 28])
 
         # [1527, 1, 28] x(bmm) [1527, 28, 1] == [1527, 1, 1] -(squeeze)-> [1527]
-        scores = torch.bmm(mol_vec, cand_vec).squeeze() 
+        scores = torch.bmm(mol_vec, cand_vec).squeeze() # referring to paper -> h(g) . z(g)
         # tensor([-0.5511, -0.5580, -0.3871,  ...,  0.3820,  0.3339,  0.2747],
         
         cnt,tot,acc = 0,0,0
@@ -156,8 +156,8 @@ class JTNNVAE(nn.Module):
                     acc += 1 
 
                 label = create_var(torch.LongTensor([label]))
-                print(cur_score.view(1,-1).tolist(), label.item())
-                print()
+                # print(cur_score.view(1,-1).tolist(), label.item())
+                # print()
                 all_loss.append( self.assm_loss(cur_score.view(1,-1), label) ) # assm_loss -> softmax loss in reality, label is the index on cur_score which is target value
         
         #all_loss = torch.stack(all_loss).sum() / len(mol_batch)
@@ -252,6 +252,8 @@ class JTNNVAE(nn.Module):
     
     def decode(self, tree_vec, mol_vec, prob_decode):
         pred_root,pred_nodes = self.decoder.decode(tree_vec, prob_decode)
+
+        raise
 
         #Mark nid & is_leaf & atommap
         for i,node in enumerate(pred_nodes):

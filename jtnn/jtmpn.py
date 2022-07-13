@@ -46,7 +46,7 @@ class JTMPN(nn.Module):
         total_atoms = 0
         scope = []
 
-        # tree message + candidate subgraph message
+        # candidate subgraph message passing / belief propagation, the same as full graph encoder
         # -------------------------------------------
         
         # print(len(tree_mess))
@@ -65,7 +65,8 @@ class JTMPN(nn.Module):
         # print(max(total)) # depends on the last node of 40 trees being indexed
         # print(len(all_mess)) # depends on the number of traversals in total of the 40 trees
 
-        for mol,all_nodes,ctr_node in cand_batch:
+        test_bonds = []
+        for mol,all_nodes,ctr_node, tree in cand_batch:
             # how they prepare the subgraph molecule with their respective index is important
             # because used here (enum_assemble)
 
@@ -79,13 +80,19 @@ class JTMPN(nn.Module):
             # mol2 = Chem.Mol(mol)
             # for atom in mol2.GetAtoms():
             #     atom.SetProp('molAtomMapNumber', str(atom.GetIdx()))
-            # print(Chem.MolToSmiles(mol2))
-            # print(Chem.MolToSmiles(ctr_node.mol))
-            # print(Chem.MolToSmiles(mol))
+            # def str_format(x):
+            #     return "'{}',".format(x)
+
+            # print(str_format(tree.smiles))
+            # print(str_format(Chem.MolToSmiles(ctr_node.mol))) # actual node smiles
+            # print(str_format(Chem.MolToSmiles(ctr_node.label_mol))) # actual label of the molTreeNode after combining it's neighbors
+            # print(str_format(Chem.MolToSmiles(mol))) # candidate/pred label of the mol after combining it's neighbors
+            # print(str_format(Chem.MolToSmiles(mol2))) # candidate/pred label of the mol after combining it's neighbors
 
             for atom in mol.GetAtoms():
                 fatoms.append( atom_features(atom) )
                 in_bonds.append([]) # in_bonds for that specific atom
+                # test_bonds.append([])
         
             for bond in mol.GetBonds():
                 a1 = bond.GetBeginAtom()
@@ -112,6 +119,7 @@ class JTMPN(nn.Module):
                 # bfeature - bondtype + stereo prop one hot encoding
                 fbonds.append( torch.cat([fatoms[x], bfeature], 0) )
                 in_bonds[y].append(b)
+                # test_bonds[y].append(b - len(all_mess)) # added for test
 
                 # print(in_bonds[y], y, b)
 
@@ -119,21 +127,83 @@ class JTMPN(nn.Module):
                 all_bonds.append((y,x))
                 fbonds.append( torch.cat([fatoms[y], bfeature], 0) )
                 in_bonds[x].append(b)
+                # test_bonds[x].append(b - len(all_mess))
 
                 # print(in_bonds[x], x, b)
                 # print()
 
-                if x_bid >= 0 and y_bid >= 0 and x_bid != y_bid: 
+                if x_bid >= 0 and y_bid >= 0 and x_bid != y_bid: # a[u] != a[v]
                     # if this two index on the candidate subgraph doesn't belong to the same MolTreeNode
                     # print('x_nid, y_nid', x_nid, y_nid) # idx on candidate subgraph - will show they don't belong to the same fragment
                     # print('x_bid, y_bid', x_bid, y_bid) # idx on molTree itself
 
                     if (x_bid,y_bid) in mess_dict:
                         mess_idx = mess_dict[(x_bid,y_bid)]
-                        in_bonds[y].append(mess_idx)
+                        in_bonds[y].append(mess_idx) # Message(a[u], a[v])
                     if (y_bid,x_bid) in mess_dict:
                         mess_idx = mess_dict[(y_bid,x_bid)]
-                        in_bonds[x].append(mess_idx)
+                        in_bonds[x].append(mess_idx) # Message(a[v], a[u])
+
+                    # acts as an add on to the in_bonds[x].append(b) above
+                    # fulfilling the equation 
+                    #  Message(a[u], a[v]) + SUM[messages from neighbors neighbor's]
+
+            # all this just to prove that in_bonds calculation only calculates the subgraph itself
+            # it doesn't involve combining with the original tree to calculate the final message vector
+            # it is just purely calculating the candidate itself
+
+            # nodes_idx = [(node.idx, node.smiles) for node in all_nodes]
+            # print(nodes_idx)
+            # traversal_keys = []
+            # for key in tree_mess.keys():
+            #     if key[0] in nodes_idx or key[1] in nodes_idx:
+            #         traversal_keys.append(key)
+            # print("traversal_keys", traversal_keys)
+
+            # print('in_bonds', in_bonds, 'all_mess length', len(all_mess))
+            # traversal_used = []
+            # for bond_list in in_bonds:
+            #     temp = []
+            #     for bond_idx in bond_list:
+            #         try:
+            #             x = list(mess_dict.keys())[list(mess_dict.values()).index(bond_idx)]
+            #             temp.append(x)
+            #         except:
+            #             temp.append(bond_idx)
+            #     traversal_used.append(temp)
+            # print("traversal_used", traversal_used)
+
+            # traversal_used2 = []
+            # for bond_list in in_bonds:
+            #     temp = []
+            #     for bond_idx in bond_list:
+            #         try:
+            #             x = list(mess_dict.keys())[list(mess_dict.values()).index(bond_idx)]
+            #             temp.append(x)
+            #         except:
+            #             temp.append(bond_idx - len(all_mess))
+            #     traversal_used2.append(temp)
+
+            # print("traversal_used2", traversal_used2)
+            # print('all_bonds', all_bonds)
+
+            # traversal_used3 = []
+            # for trav in traversal_used2:
+            #     temp = []
+            #     for val in trav:
+            #         if isinstance(val, int):
+            #             temp.append(list(all_bonds[val]))
+            #         else:
+            #             temp.append(val)
+
+            #     traversal_used3.append(temp)
+
+            # print("traversal_used3", traversal_used3)
+            
+            # # filtered bonds
+            # # print('test_bonds', test_bonds)
+            # print('ctr_bid', ctr_bid)
+            # raise
             
             scope.append((total_atoms,n_atoms))
             total_atoms += n_atoms
@@ -193,6 +263,8 @@ class JTMPN(nn.Module):
             # print(len(tree_mess)) # dictionary of all traversals
             # print(tree_message.size()) # torch.Size([1133, 450]) 
             # print(graph_message.size()) # torch.Size([26242, 450])
+            
+            # stack the two messages together just to allow index_select_ND function to select from all of these messages
             message = torch.cat([tree_message,graph_message], dim=0) # size 28349, 450
             nei_message = index_select_ND(message, 0, bgraph)
             nei_message = nei_message.sum(dim=1)
