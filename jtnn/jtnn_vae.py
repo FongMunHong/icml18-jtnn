@@ -114,7 +114,7 @@ class JTNNVAE(nn.Module):
             for node in mol_tree.nodes:
                 #Leaf node's attachment is determined by neighboring node's attachment
                 if node.is_leaf or len(node.cands) == 1: continue
-                cands.extend( [(cand, mol_tree.nodes, node, mol_tree) for cand in node.cand_mols] )
+                cands.extend( [(cand, mol_tree.nodes, node) for cand in node.cand_mols] )
                 # print([i] * len(node.cands))
                 # [0, 0, 0, 0, 0, 0, 0, 0, 0]
                 # [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -262,11 +262,11 @@ class JTNNVAE(nn.Module):
             if len(node.neighbors) > 1:
                 set_atommap(node.mol, node.nid)
 
-        tree_mess = self.jtnn([pred_root])[0]
+        tree_mess, _ = self.jtnn([pred_root]) # will get propagation list, and all its tree message dictinary
 
         cur_mol = copy_edit_mol(pred_root.mol)
         global_amap = [{}] + [{} for node in pred_nodes]
-        global_amap[1] = {atom.GetIdx():atom.GetIdx() for atom in cur_mol.GetAtoms()}
+        global_amap[1] = {atom.GetIdx():atom.GetIdx() for atom in cur_mol.GetAtoms()} # {0:0, 1:1}
 
         cur_mol = self.dfs_assemble(tree_mess, mol_vec, pred_nodes, cur_mol, global_amap, [], pred_root, None, prob_decode)
         if cur_mol is None: 
@@ -290,16 +290,22 @@ class JTNNVAE(nn.Module):
         return stereo_cands[max_id.data[0]]
 
     def dfs_assemble(self, tree_mess, mol_vec, all_nodes, cur_mol, global_amap, fa_amap, cur_node, fa_node, prob_decode):
-        fa_nid = fa_node.nid if fa_node is not None else -1
-        prev_nodes = [fa_node] if fa_node is not None else []
+        fa_nid = fa_node.nid if fa_node is not None else -1 # -1 (start)
+        prev_nodes = [fa_node] if fa_node is not None else [] # prev_nodes = [] (start)
 
-        children = [nei for nei in cur_node.neighbors if nei.nid != fa_nid]
-        neighbors = [nei for nei in children if nei.mol.GetNumAtoms() > 1]
-        neighbors = sorted(neighbors, key=lambda x:x.mol.GetNumAtoms(), reverse=True)
-        singletons = [nei for nei in children if nei.mol.GetNumAtoms() == 1]
+        children = [nei for nei in cur_node.neighbors if nei.nid != fa_nid] # current node neighbors or childer
+        neighbors = [nei for nei in children if nei.mol.GetNumAtoms() > 1]  # not singleton neighbors
+        neighbors = sorted(neighbors, key=lambda x:x.mol.GetNumAtoms(), reverse=True) # sort them by size descending
+        singletons = [nei for nei in children if nei.mol.GetNumAtoms() == 1] # single out singleton
         neighbors = singletons + neighbors
 
+        # print('cur_node', cur_node.smiles)
+        # print('neighbors', [node.smiles for node in neighbors])
+        # print()
         cur_amap = [(fa_nid,a2,a1) for nid,a1,a2 in fa_amap if nid == cur_node.nid]
+        # print(cur_amap)
+        # print(cur_node, neighbors, prev_nodes, cur_amap)
+        # print("HELLO", cur_node.smiles, [nei.smiles for nei in neighbors])
         cands = enum_assemble(cur_node, neighbors, prev_nodes, cur_amap)
         if len(cands) == 0:
             return None
@@ -307,19 +313,22 @@ class JTNNVAE(nn.Module):
 
         cands = [(candmol, all_nodes, cur_node) for candmol in cand_mols]
 
-        cand_vecs = self.jtmpn(cands, tree_mess)
+        cand_vecs = self.jtmpn(cands, tree_mess) # cands act as cand_batch for jtmpn
         cand_vecs = self.G_mean(cand_vecs)
-        mol_vec = mol_vec.squeeze()
-        scores = torch.mv(cand_vecs, mol_vec) * 20
+        mol_vec = mol_vec.squeeze() # [1, 28] -> [28]
+        # print(cand_vecs.size()) # [numb of cand, 28 (G_mean)]
+        # print(mol_vec.size()) # [28]
+        scores = torch.mv(cand_vecs, mol_vec) * 20 # h[G] (cand) . z[G] (mol_vec) ---- [2, 28] . [28] --> [2]
+        # print(scores.size()) # [number of cand]
 
         if prob_decode:
             probs = nn.Softmax()(scores.view(1,-1)).squeeze() + 1e-5 #prevent prob = 0
             cand_idx = torch.multinomial(probs, probs.numel())
         else:
-            _,cand_idx = torch.sort(scores, descending=True)
+            _,cand_idx = torch.sort(scores, descending=True) # get the descending index score
 
         backup_mol = Chem.RWMol(cur_mol)
-        for i in range(cand_idx.numel()):
+        for i in range(cand_idx.numel()): # if there are two scores [1, 0] -> cand_idx.numel() will be 2
             cur_mol = Chem.RWMol(backup_mol)
             pred_amap = cand_amap[cand_idx[i].item()]
             new_global_amap = copy.deepcopy(global_amap)

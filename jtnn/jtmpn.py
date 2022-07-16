@@ -66,7 +66,7 @@ class JTMPN(nn.Module):
         # print(len(all_mess)) # depends on the number of traversals in total of the 40 trees
 
         test_bonds = []
-        for mol,all_nodes,ctr_node, tree in cand_batch:
+        for mol,all_nodes,ctr_node in cand_batch:
             # how they prepare the subgraph molecule with their respective index is important
             # because used here (enum_assemble)
 

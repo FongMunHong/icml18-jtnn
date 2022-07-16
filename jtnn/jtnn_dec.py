@@ -254,24 +254,24 @@ class JTNNDecoder(nn.Module):
         zero_pad = create_var(torch.zeros(1,1,self.hidden_size))
 
         #Root Prediction
-        root_hidden = torch.cat([init_hidden, mol_vec], dim=1)
-        print(root_hidden.size())
-        raise
+        root_hidden = torch.cat([init_hidden, mol_vec], dim=1) # 1 x [28 + 450]
         root_hidden = nn.ReLU()(self.W(root_hidden))
         root_score = self.W_o(root_hidden)
-        _,root_wid = torch.max(root_score, dim=1)
-        root_wid = root_wid.item()
+        _,root_wid = torch.max(root_score, dim=1) # root_wid - get the index of the prediction
+        root_wid = root_wid.item() 
 
-        root = MolTreeNode(self.vocab.get_smiles(root_wid))
+        root = MolTreeNode(self.vocab.get_smiles(root_wid)) # get smiles of the root based on vocab
         root.wid = root_wid
         root.idx = 0
-        stack.append( (root, self.vocab.get_slots(root.wid)) )
+        stack.append( (root, self.vocab.get_slots(root.wid)) ) 
+        # get_slots to get property of the root
+        # (atom.GetSymbol(), atom.GetFormalCharge(), atom.GetTotalNumHs()
 
         all_nodes = [root]
         h = {}
         for step in range(MAX_DECODE_LEN):
             node_x,fa_slot = stack[-1]
-            cur_h_nei = [ h[(node_y.idx,node_x.idx)] for node_y in node_x.neighbors ]
+            cur_h_nei = [ h[(node_y.idx,node_x.idx)] for node_y in node_x.neighbors ] # get message from root neighbor's neighbors, remember message i->j, is the sum of k which is neighbors of i.
             if len(cur_h_nei) > 0:
                 cur_h_nei = torch.stack(cur_h_nei, dim=0).view(1,-1,self.hidden_size)
             else:
@@ -289,13 +289,15 @@ class JTNNDecoder(nn.Module):
             if prob_decode:
                 backtrack = (torch.bernoulli(1.0 - stop_score.data)[0] == 1)
             else:
-                backtrack = (stop_score.item() < 0.5)
+                backtrack = (stop_score.item() < 0.5) # if larger than 0.5 than backtrack
 
             if not backtrack: #Forward: Predict next clique
                 new_h = GRU(cur_x, cur_h_nei, self.W_z, self.W_r, self.U_r, self.W_h)
+                # print('new_h size', new_h.size()) # 1 x 450 for draw nei
                 pred_hidden = torch.cat([new_h,mol_vec], dim=1)
                 pred_hidden = nn.ReLU()(self.W(pred_hidden))
-                pred_score = nn.Softmax()(self.W_o(pred_hidden) * 20)
+                pred_score = nn.Softmax()(self.W_o(pred_hidden) * 20) # outputs the probability of 780 matrix to predict vocab wid
+
                 if prob_decode:
                     sort_wid = torch.multinomial(pred_score.data.squeeze(), 5)
                 else:
@@ -303,13 +305,18 @@ class JTNNDecoder(nn.Module):
                     sort_wid = sort_wid.data.squeeze()
 
                 next_wid = None
-                for wid in sort_wid[:5]:
-                    slots = self.vocab.get_slots(wid)
+                for wid in sort_wid[:5]: # top 5 wid prediction
+                    # slots contain properties of each atom in the fragment
+                    slots = self.vocab.get_slots(wid) # get slots for the pid prediction
                     node_y = MolTreeNode(self.vocab.get_smiles(wid))
+                    # print()
+                    # print('current', self.vocab.get_smiles(node_x.wid), node_x.wid) 
+                    # print('next', self.vocab.get_smiles(wid), wid)
                     if have_slots(fa_slot, slots) and can_assemble(node_x, node_y):
                         next_wid = wid
-                        next_slots = slots
+                        next_slots = slots # any removed slots will not be taken into account for the next generation
                         break
+                raise
 
                 if next_wid is None:
                     backtrack = True #No more children can be added
@@ -318,7 +325,7 @@ class JTNNDecoder(nn.Module):
                     node_y.wid = next_wid
                     node_y.idx = step + 1
                     node_y.neighbors.append(node_x)
-                    h[(node_x.idx,node_y.idx)] = new_h[0]
+                    h[(node_x.idx,node_y.idx)] = new_h[0] # new_h[0] squeeze [1, 450] -> [450]
                     stack.append( (node_y,next_slots) )
                     all_nodes.append(node_y)
 
@@ -326,7 +333,21 @@ class JTNNDecoder(nn.Module):
                 if len(stack) == 1: 
                     break #At root, terminate
 
-                node_fa,_ = stack[-2]
+                # for st in stack[::-1]:
+                #     print(self.vocab.get_smiles(st[0].wid))
+                # print()
+                # print("stack[-2]", self.vocab.get_smiles(stack[-2][0].wid))
+                # print("\n")
+
+                node_fa,_ = stack[-2] 
+                # since you want to backtrack, the top node is your current node, 
+                # thus it is reasonable to take the second node below the stack to start th prediction
+                #      1
+                #    /   \
+                #   2     3
+                #  / \   / \
+                # 4   5 6   7
+                # stack top[4, 2, 1], since 4 is leaf, thus start from 2, find all neighbors except 4 as neighboring message
                 cur_h_nei = [ h[(node_y.idx,node_x.idx)] for node_y in node_x.neighbors if node_y.idx != node_fa.idx ]
                 if len(cur_h_nei) > 0:
                     cur_h_nei = torch.stack(cur_h_nei, dim=0).view(1,-1,self.hidden_size)
@@ -336,7 +357,7 @@ class JTNNDecoder(nn.Module):
                 new_h = GRU(cur_x, cur_h_nei, self.W_z, self.W_r, self.U_r, self.W_h)
                 h[(node_x.idx,node_fa.idx)] = new_h[0]
                 node_fa.neighbors.append(node_x)
-                stack.pop()
+                stack.pop() # if stack is treated as a list, pop is to remove last element
 
         return root, all_nodes
 
@@ -353,22 +374,27 @@ def dfs(stack, x, fa):
         stack.append((y,x,0))
 
 def have_slots(fa_slots, ch_slots):
+    # check if there are 3 atoms above which are not occupied
     if len(fa_slots) > 2 and len(ch_slots) > 2:
         return True
     matches = []
+    # print(fa_slots)
+    # print(ch_slots)
     for i,s1 in enumerate(fa_slots):
-        a1,c1,h1 = s1
+        a1,c1,h1 = s1 # a -> atom, c -> charge, h -> hydrogen
         for j,s2 in enumerate(ch_slots):
             a2,c2,h2 = s2
-            if a1 == a2 and c1 == c2 and (a1 != "C" or h1 + h2 >= 4):
+            if a1 == a2 and c1 == c2 and (a1 != "C" or h1 + h2 >= 4): # h1 + h2 are both from C and C, thus adding up hydrogens will be more than 4
                 matches.append( (i,j) )
+                # print('matches', i, j)
 
     if len(matches) == 0: return False
 
-    fa_match,ch_match = zip(*matches)
-    if len(set(fa_match)) == 1 and 1 < len(fa_slots) <= 2: #never remove atom from ring
-        fa_slots.pop(fa_match[0])
-    if len(set(ch_match)) == 1 and 1 < len(ch_slots) <= 2: #never remove atom from ring
+    fa_match,ch_match = zip(*matches) # index of fa_slots and ch_slots that matches
+    if len(set(fa_match)) == 1 and 1 < len(fa_slots) <= 2: #never remove atom from ring / rings has 3 atoms above
+        fa_slots.pop(fa_match[0]) 
+        # removes this slot so if the node has another neighbor, this slot wouldn't be taken twice
+    if len(set(ch_match)) == 1 and 1 < len(ch_slots) <= 2: #never remove atom from ring / rings has 3 atoms above
         ch_slots.pop(ch_match[0])
 
     return True

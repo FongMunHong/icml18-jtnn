@@ -78,7 +78,7 @@ class JTNNEncoder(nn.Module):
             # for each tree in batch 40, we have each pairs of cliques
             # in which the first node is the target node (cur_x)
             # and the we are calculating it's neighbors (cur_h_nei)
-            for node_x,node_y in prop_list:
+            for node_x,node_y in prop_list: # message i -> j
                 # node x is the target node
                 x,y = node_x.idx,node_y.idx
                 cur_x.append(node_x.wid)
@@ -86,9 +86,9 @@ class JTNNEncoder(nn.Module):
                 h_nei = []
                 # find all neighbors of node x
                 # should be within the range of 8 (MAX_NB)
-                for node_z in node_x.neighbors:
+                for node_z in node_x.neighbors: # sum of all of neighbors i which is k
                     z = node_z.idx
-                    if z == y: continue # one off, remove duplicate edges, ij, ji
+                    if z == y: continue # direct neighbors 
                     h_nei.append(h[(z,x)]) # append embedding of all neighbors
 
                 # if there is not enough neighbors, pad them  with 

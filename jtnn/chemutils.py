@@ -257,6 +257,7 @@ def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[]):
     all_attach_confs = []
     singletons = [nei_node.nid for nei_node in neighbors + prev_nodes if nei_node.mol.GetNumAtoms() == 1]
 
+
     def search(cur_amap, depth):
         if len(all_attach_confs) > MAX_NCAND:
             return
@@ -264,8 +265,13 @@ def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[]):
             all_attach_confs.append(cur_amap)
             return
 
+        # print("hello", all_attach_confs)
+
         nei_node = neighbors[depth]
+        print('node smiles',node.smiles, 'nei_node', nei_node.smiles)
+        print("cur_amap", cur_amap) # [(nei_idx, atom.GetIdx(), b1.GetIdx())] elements of cur_amap
         cand_amap = enum_attach(node.mol, nei_node, cur_amap, singletons)
+        print('cand_amap', cand_amap, 'depth', depth)
         cand_smiles = set()
         candidates = []
         for amap in cand_amap:
