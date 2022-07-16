@@ -201,13 +201,13 @@ def local_attach(ctr_mol, neighbors, prev_nodes, amap_list):
 def enum_attach(ctr_mol, nei_node, amap, singletons):
     nei_mol,nei_idx = nei_node.mol,nei_node.nid
     att_confs = []
-    black_list = [atom_idx for nei_id,atom_idx,_ in amap if nei_id in singletons]
-    ctr_atoms = [atom for atom in ctr_mol.GetAtoms() if atom.GetIdx() not in black_list]
-    ctr_bonds = [bond for bond in ctr_mol.GetBonds()]
+    black_list = [atom_idx for nei_id,atom_idx,_ in amap if nei_id in singletons] # black list those which are singletons in the full atommap?
+    ctr_atoms = [atom for atom in ctr_mol.GetAtoms() if atom.GetIdx() not in black_list] # center molTreeNode atoms
+    ctr_bonds = [bond for bond in ctr_mol.GetBonds()] # center molTreeNode bonds
 
     if nei_mol.GetNumBonds() == 0: #neighbor singleton
         nei_atom = nei_mol.GetAtomWithIdx(0)
-        used_list = [atom_idx for _,atom_idx,_ in amap]
+        used_list = [atom_idx for _,atom_idx,_ in amap] # amap store used atom indexes so not to duplicate attachments
         for atom in ctr_atoms:
             if atom_equal(atom, nei_atom) and atom.GetIdx() not in used_list:
                 new_amap = amap + [(nei_idx, atom.GetIdx(), 0)]
@@ -220,7 +220,7 @@ def enum_attach(ctr_mol, nei_node, amap, singletons):
 
         for atom in ctr_atoms: 
             #Optimize if atom is carbon (other atoms may change valence)
-            if atom.GetAtomicNum() == 6 and atom.GetTotalNumHs() < bond_val:
+            if atom.GetAtomicNum() == 6 and atom.GetTotalNumHs() < bond_val: # if carbon hydrogen valence left is less than of attaching neighbor (bond)
                 continue
             if atom_equal(atom, b1):
                 new_amap = amap + [(nei_idx, atom.GetIdx(), b1.GetIdx())]
@@ -269,7 +269,11 @@ def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[]):
 
         nei_node = neighbors[depth]
         print('node smiles',node.smiles, 'nei_node', nei_node.smiles)
-        print("cur_amap", cur_amap) # [(nei_idx, atom.GetIdx(), b1.GetIdx())] elements of cur_amap
+        print("cur_amap", cur_amap) 
+        # [(nei_idx, atom.GetIdx(), b1.GetIdx())] elements of cur_amap
+        # nei_idx -> (MolTreeNode) node.nid, assigned before entering enum_assemble
+        # atom.GetIdx() -> center node atoms index
+        # b1.getIdx -> index of atom in neighboring molTreeNode which is attached center node
         cand_amap = enum_attach(node.mol, nei_node, cur_amap, singletons)
         print('cand_amap', cand_amap, 'depth', depth)
         cand_smiles = set()
