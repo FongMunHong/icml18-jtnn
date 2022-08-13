@@ -316,7 +316,7 @@ class JTNNDecoder(nn.Module):
                         next_wid = wid
                         next_slots = slots # any removed slots will not be taken into account for the next generation
                         break
-                raise
+                # raise
 
                 if next_wid is None:
                     backtrack = True #No more children can be added

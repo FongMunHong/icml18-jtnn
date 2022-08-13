@@ -1,4 +1,3 @@
-from tkinter.tix import MAX
 import torch
 import torch.nn as nn
 from collections import deque
@@ -34,6 +33,7 @@ class JTNNEncoder(nn.Module):
             order = get_prop_order(root)
             orders.append(order)
 
+
         # for i, order in enumerate(orders[:1]):
         #     print(i , 'pair', '-root:', root_batch[i].idx)
         #     print('root neighbors', [nei.idx for nei in root_batch[i].neighbors])
@@ -42,6 +42,9 @@ class JTNNEncoder(nn.Module):
         #         print(pair, end=" | ")
 
         #     print('\n')
+        # for order in orders[0]:
+        #     print([x.idx for x in order[0]])
+
 
         # each C(i), C(j) has two message vectors m(ij), m(ji)
         # 0 pair -root: 0

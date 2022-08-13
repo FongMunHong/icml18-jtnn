@@ -33,11 +33,11 @@ hidden_size = int(opts.hidden_size)
 latent_size = int(opts.latent_size)
 depth = int(opts.depth)
 
-# model = JTNNVAE(vocab, hidden_size, latent_size, depth)
-model = JTNNVAE(vocab, hidden_size, latent_size, depth, stereo=False)
+model = JTNNVAE(vocab, hidden_size, latent_size, depth)
+# model = JTNNVAE(vocab, hidden_size, latent_size, depth, stereo=False)
 # model.load_state_dict(torch.load(opts.model_path, map_location = torch.device('cpu')))
 model.load_state_dict(torch.load(opts.model_path))
-# model = model.cuda()
+model = model.cuda()
 
 np.random.seed(0)
 x = np.random.randn(latent_size)
@@ -48,11 +48,27 @@ y -= y.dot(x) * x
 y /= np.linalg.norm(y)
 
 # z0 = "CN1C(C2=CC(NC3C[C@H](C)C[C@@H](C)C3)=CN=C2)=NN=C1"
-z0 = "COC1=CC(OC)=CC([C@@H]2C[NH+](CCC(F)(F)F)CC2)=C1"
+# z0 = "COC1=CC(OC)=CC([C@@H]2C[NH+](CCC(F)(F)F)CC2)=C1"
+z0 = "O=c1c2ccc3c(=O)n(-c4nccs4)c(=O)c4ccc(c(=O)n1-c1nccs1)c2c34" # not working
+# z0 = "C1CC2CCC3CCC4CCC5CCC6CCC1C1C2C3C4C5C61" # not working
+# z0 = "O=C1[C@@H]2C=C[C@@H](C=CC2)C1(c1ccccc1)c1ccccc1" # not working
+# z0 = "O=C([O-])CC[C@@]12CCCC[C@]1(O)OC(=O)CC2" # works
+# z0 = "ON=C1C[C@H]2CC3(C[C@@H](C1)c1ccccc12)OCCO3" # works
+# z0 = "C[C@H]1CC(=O)[C@H]2[C@@]3(O)C(=O)c4cccc(O)c4[C@@H]4O[C@@]43[C@@H](O)C[C@]2(O)C1" # not working
+# z0 = "Cc1cc(NC(=O)CSc2nnc3c4ccccc4n(C)c3n2)ccc1Br" # works
+
 z0 = model.encode_latent_mean([z0]).squeeze() # len z0 - (28 + 28) = 56
 z0 = z0.data.cpu().numpy()
 
-
+tree_z, mol_z = torch.Tensor(z0).unsqueeze(0).chunk(2, dim=1)
+tree_z, mol_z = create_var(tree_z), create_var(mol_z)
+s = model.decode(tree_z, mol_z, prob_decode=False)
+m = Chem.MolFromSmiles(s)
+# for bond in m.GetBonds():
+#     print(bond.GetBondType())
+# Chem.Kekulize(m)
+# print("Ending", Chem.MolToSmiles(m,kekuleSmiles=True))
+# raise
 
 delta = 1
 nei_mols = []

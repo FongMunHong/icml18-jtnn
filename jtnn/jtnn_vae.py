@@ -253,8 +253,6 @@ class JTNNVAE(nn.Module):
     def decode(self, tree_vec, mol_vec, prob_decode):
         pred_root,pred_nodes = self.decoder.decode(tree_vec, prob_decode)
 
-        raise
-
         #Mark nid & is_leaf & atommap
         for i,node in enumerate(pred_nodes):
             node.nid = i + 1
@@ -268,6 +266,7 @@ class JTNNVAE(nn.Module):
         global_amap = [{}] + [{} for node in pred_nodes]
         global_amap[1] = {atom.GetIdx():atom.GetIdx() for atom in cur_mol.GetAtoms()} # {0:0, 1:1}
 
+        # print(tree_mess.keys()) # based on propagation # [(4, 3), (3, 2), (2, 1), (1, 0), (0, 1), (1, 2), (2, 3), (3, 4)]
         cur_mol = self.dfs_assemble(tree_mess, mol_vec, pred_nodes, cur_mol, global_amap, [], pred_root, None, prob_decode)
         if cur_mol is None: 
             return None
@@ -277,6 +276,7 @@ class JTNNVAE(nn.Module):
         cur_mol = Chem.MolFromSmiles(Chem.MolToSmiles(cur_mol))
         if cur_mol is None: return None
         if self.use_stereo == False:
+            print("ending smiles", Chem.MolToSmiles(cur_mol))
             return Chem.MolToSmiles(cur_mol)
 
         smiles2D = Chem.MolToSmiles(cur_mol)
@@ -287,7 +287,7 @@ class JTNNVAE(nn.Module):
         stereo_vecs = self.G_mean(stereo_vecs)
         scores = nn.CosineSimilarity()(stereo_vecs, mol_vec)
         _,max_id = scores.max(dim=0)
-        return stereo_cands[max_id.data[0]]
+        return stereo_cands[max_id.item()]
 
     def dfs_assemble(self, tree_mess, mol_vec, all_nodes, cur_mol, global_amap, fa_amap, cur_node, fa_node, prob_decode):
         fa_nid = fa_node.nid if fa_node is not None else -1 # -1 (start)
@@ -318,7 +318,7 @@ class JTNNVAE(nn.Module):
         mol_vec = mol_vec.squeeze() # [1, 28] -> [28]
         # print(cand_vecs.size()) # [numb of cand, 28 (G_mean)]
         # print(mol_vec.size()) # [28]
-        scores = torch.mv(cand_vecs, mol_vec) * 20 # h[G] (cand) . z[G] (mol_vec) ---- [2, 28] . [28] --> [2]
+        scores = torch.mv(cand_vecs, mol_vec) * 20 # h[G] (cand) . z[G] (mol_vec) ---- ( [2(number of cands), 28] . [28] ) --> [2]
         # print(scores.size()) # [number of cand]
 
         if prob_decode:
@@ -328,9 +328,20 @@ class JTNNVAE(nn.Module):
             _,cand_idx = torch.sort(scores, descending=True) # get the descending index score
 
         backup_mol = Chem.RWMol(cur_mol)
+
+        print('cand_amap', cand_amap)
+        def show_atom_number(mol, label):
+            for atom in mol.GetAtoms():
+                atom.SetProp(label, str(atom.GetIdx()))
+            return mol
+        test_mol = show_atom_number(Chem.RWMol(cur_mol), "molAtomMapNumber")
+        print('cur_mol', Chem.MolToSmiles(test_mol))
+        print('cand_smiles', cand_smiles)
+
         for i in range(cand_idx.numel()): # if there are two scores [1, 0] -> cand_idx.numel() will be 2
+            # try attaching all the possible candidate
             cur_mol = Chem.RWMol(backup_mol)
-            pred_amap = cand_amap[cand_idx[i].item()]
+            pred_amap = cand_amap[cand_idx[i].item()] # 1, next loop, 0 --> based on array [1, 0]
             new_global_amap = copy.deepcopy(global_amap)
 
             for nei_id,ctr_atom,nei_atom in pred_amap:
@@ -338,16 +349,21 @@ class JTNNVAE(nn.Module):
                     continue
                 new_global_amap[nei_id][nei_atom] = new_global_amap[cur_node.nid][ctr_atom]
 
+            # print('new_global_amap', new_global_amap)
             cur_mol = attach_mols(cur_mol, children, [], new_global_amap) #father is already attached
             new_mol = cur_mol.GetMol()
-            new_mol = Chem.MolFromSmiles(Chem.MolToSmiles(new_mol))
+            new_mol = Chem.MolFromSmiles(Chem.MolToSmiles(new_mol)) # validate if they are plausible
 
             if new_mol is None: continue
             
+            # if possible to attach candidate, then proceed to next node's neighbors
             result = True
             for nei_node in children:
                 if nei_node.is_leaf: continue
-                cur_mol = self.dfs_assemble(tree_mess, mol_vec, all_nodes, cur_mol, new_global_amap, pred_amap, nei_node, cur_node, prob_decode)
+                print('here')
+                print()
+                cur_mol = self.dfs_assemble(tree_mess, mol_vec, all_nodes, cur_mol, new_global_amap, pred_amap, nei_node, cur_node, prob_decode) 
+                # cur_node is fa_node, which is used as an indicator of recalculating neighbors over again in the next recursion
                 if cur_mol is None: 
                     result = False
                     break

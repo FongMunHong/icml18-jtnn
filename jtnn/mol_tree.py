@@ -41,10 +41,16 @@ class MolTreeNode(object):
     def recover(self, original_mol):
         clique = []
         clique.extend(self.clique)
+
+        # label atom on self.clique with nid         
         if not self.is_leaf:
             for cidx in self.clique:
-                original_mol.GetAtomWithIdx(cidx).SetAtomMapNum(self.nid)
+                original_mol.GetAtomWithIdx(cidx).SetAtomMapNum(self.nid) 
+                # on the complete mol (full structure), for each fragments, put label nid on it's atoms
+        
+        # if not self.is_leaf: print(Chem.MolToSmiles(original_mol))
 
+        # label neighboring clique atom with nid         
         for nei_node in self.neighbors:
             clique.extend(nei_node.clique)
             if nei_node.is_leaf: #Leaf node, no need to mark 
@@ -55,7 +61,9 @@ class MolTreeNode(object):
                     atom = original_mol.GetAtomWithIdx(cidx)
                     atom.SetAtomMapNum(nei_node.nid)
 
-        clique = list(set(clique))
+        # if not self.is_leaf: print(Chem.MolToSmiles(original_mol)), print()
+
+        clique = list(set(clique)) # consist of self node, and neighbors
         label_mol = get_clique_mol(original_mol, clique)
         self.label = Chem.MolToSmiles(Chem.MolFromSmiles(get_smiles(label_mol)))
         self.label_mol = get_mol(self.label)
@@ -104,7 +112,24 @@ class MolTree(object):
         self.smiles2D = Chem.MolToSmiles(mol)
         self.stereo_cands = decode_stereo(self.smiles2D)
 
+        def show_atom_number(mol, label):
+            for atom in mol.GetAtoms():
+                atom.SetProp(label, str(atom.GetIdx()))
+            return mol
+        test_mol = show_atom_number(Chem.RWMol(self.mol), "molAtomMapNumber")
+        print('self.mol', Chem.MolToSmiles(test_mol))
+
+        # cliques are just subgraphs/fragments of the molecule which are part of the vocab, the numbers are atoms numbers on the molecule which can form fragment
+        # cliques = [[0, 1], [1, 2], [4, 5], [5, 6], [5, 7], [14, 15], [2, 14, 13, 12, 4, 3], [8, 7, 11, 10, 9], [16, 17, 18, 19, 20, 15], [5]]
+        
+        # edges are for Mol tree, where each number represent a certain clique
+        # edges = [(0, 13), (1, 13), (2, 10), (2, 13), (3, 10), (3, 14), (4, 14), (5, 14), (5, 15), (6, 7), (6, 15), (7, 11), (8, 12), (8, 15), (9, 10)]
+
         cliques, edges = tree_decomp(self.mol)
+        print('cliques', cliques)
+        print('edges', edges)
+        print()
+        # raise
         self.nodes = []
         root = 0
         for i,c in enumerate(cliques):
@@ -126,6 +151,8 @@ class MolTree(object):
             node.nid = i + 1
             if len(node.neighbors) > 1: #Leaf node mol is not marked
                 set_atommap(node.mol, node.nid)
+                # print(Chem.MolToSmiles(node.mol))
+                # print(i + 1)
             node.is_leaf = (len(node.neighbors) == 1)
 
     def size(self):

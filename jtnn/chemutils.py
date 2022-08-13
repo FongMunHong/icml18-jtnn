@@ -163,32 +163,45 @@ def ring_bond_equal(b1, b2, reverse=False):
     return atom_equal(b1[0], b2[0]) and atom_equal(b1[1], b2[1])
 
 def attach_mols(ctr_mol, neighbors, prev_nodes, nei_amap):
+    # prev_nodes only keep the parent of the ctr mol
+
+    # print('ctr_mol', Chem.MolToSmiles(ctr_mol))
+
+    # nei_amap[nei_id][nei_atom] = ctr_atom 
+
     prev_nids = [node.nid for node in prev_nodes]
+    
     for nei_node in prev_nodes + neighbors:
         nei_id,nei_mol = nei_node.nid,nei_node.mol
-        amap = nei_amap[nei_id]
+        amap = nei_amap[nei_id] # {nei_atom idx: ctr_atom idx}
         for atom in nei_mol.GetAtoms():
-            if atom.GetIdx() not in amap:
+            if atom.GetIdx() not in amap: # get all atoms into amap
                 new_atom = copy_atom(atom)
                 amap[atom.GetIdx()] = ctr_mol.AddAtom(new_atom)
 
-        if nei_mol.GetNumBonds() == 0:
+        # print(Chem.MolToSmiles(nei_mol))
+
+        if nei_mol.GetNumBonds() == 0: 
             nei_atom = nei_mol.GetAtomWithIdx(0)
             ctr_atom = ctr_mol.GetAtomWithIdx(amap[0])
             ctr_atom.SetAtomMapNum(nei_atom.GetAtomMapNum())
         else:
             for bond in nei_mol.GetBonds():
-                a1 = amap[bond.GetBeginAtom().GetIdx()]
+                a1 = amap[bond.GetBeginAtom().GetIdx()] # notice amap keys is nei_atom idx, thus retrieving ctr atom index
                 a2 = amap[bond.GetEndAtom().GetIdx()]
                 if ctr_mol.GetBondBetweenAtoms(a1, a2) is None:
                     ctr_mol.AddBond(a1, a2, bond.GetBondType())
                 elif nei_id in prev_nids: #father node overrides
+                    # print("in here2")
                     ctr_mol.RemoveBond(a1, a2)
                     ctr_mol.AddBond(a1, a2, bond.GetBondType())
+
+    # print(Chem.MolToSmiles(ctr_mol))
     return ctr_mol
 
 def local_attach(ctr_mol, neighbors, prev_nodes, amap_list):
     ctr_mol = copy_edit_mol(ctr_mol)
+    # ctr_mol is RWMol object
     nei_amap = {nei.nid:{} for nei in prev_nodes + neighbors}
 
     for nei_id,ctr_atom,nei_atom in amap_list:
@@ -202,7 +215,7 @@ def enum_attach(ctr_mol, nei_node, amap, singletons):
     nei_mol,nei_idx = nei_node.mol,nei_node.nid
     att_confs = []
     black_list = [atom_idx for nei_id,atom_idx,_ in amap if nei_id in singletons] # black list those which are singletons in the full atommap?
-    ctr_atoms = [atom for atom in ctr_mol.GetAtoms() if atom.GetIdx() not in black_list] # center molTreeNode atoms
+    ctr_atoms = [atom for atom in ctr_mol.GetAtoms() if atom.GetIdx() not in black_list] # center molTreeNode atoms excluding atoms
     ctr_bonds = [bond for bond in ctr_mol.GetBonds()] # center molTreeNode bonds
 
     if nei_mol.GetNumBonds() == 0: #neighbor singleton
@@ -250,6 +263,22 @@ def enum_attach(ctr_mol, nei_node, amap, singletons):
                     if ring_bond_equal(b1, b2, reverse=True):
                         new_amap = amap + [(nei_idx, b1.GetBeginAtom().GetIdx(), b2.GetEndAtom().GetIdx()), (nei_idx, b1.GetEndAtom().GetIdx(), b2.GetBeginAtom().GetIdx())]
                         att_confs.append( new_amap )
+
+        # # need to write out possibility of 4 bonds connected
+        # used_list = [atom_idx for _,atom_idx,_ in amap]
+        # def show_atom_number(mol, label):
+        #     for atom in mol.GetAtoms():
+        #         atom.SetProp(label, str(atom.GetIdx()))
+        #     return mol
+        # test_mol = show_atom_number(Chem.RWMol(ctr_mol), "molAtomMapNumber")
+        # print('enum_attach ctr_mol', Chem.MolToSmiles(test_mol))
+        # print(used_list)
+        # print(nei_mol.GetNumAtoms())
+
+        # if len(Chem.GetSymmSSSR(ctr_mol)) >= 2 and nei_mol.GetNumAtoms() >= 3:
+        #     print("Here")
+        #     raise
+
     return att_confs
 
 #Try rings first: Speed-Up 
@@ -265,22 +294,22 @@ def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[]):
             all_attach_confs.append(cur_amap)
             return
 
-        # print("hello", all_attach_confs)
-
         nei_node = neighbors[depth]
         print('node smiles',node.smiles, 'nei_node', nei_node.smiles)
-        print("cur_amap", cur_amap) 
+
         # [(nei_idx, atom.GetIdx(), b1.GetIdx())] elements of cur_amap
-        # nei_idx -> (MolTreeNode) node.nid, assigned before entering enum_assemble
-        # atom.GetIdx() -> center node atoms index
+        # nei_idx -> (MolTreeNode) neighbor node.nid, assigned before entering enum_assemble to differentiate between MolTreeNode
+        # atom.GetIdx() -> center molTreeNode mol atom index which connects with the neighbor molTreeNode
         # b1.getIdx -> index of atom in neighboring molTreeNode which is attached center node
-        cand_amap = enum_attach(node.mol, nei_node, cur_amap, singletons)
-        print('cand_amap', cand_amap, 'depth', depth)
+        cand_amap = enum_attach(node.mol, nei_node, cur_amap, singletons) # use cur_amap to indicate how previous neighbors has already been attached
+        # print('cand_amap', cand_amap, 'depth', depth)
         cand_smiles = set()
         candidates = []
         for amap in cand_amap:
-            cand_mol = local_attach(node.mol, neighbors[:depth+1], prev_nodes, amap)
-            cand_mol = sanitize(cand_mol)
+            # depth + 1 because of list property of including [:n-1]
+            cand_mol = local_attach(node.mol, neighbors[:depth+1], prev_nodes, amap) # all possibilities created here
+            
+            cand_mol = sanitize(cand_mol) # this will filter all impossible attachments
             if cand_mol is None:
                 continue
             smiles = get_smiles(cand_mol)
@@ -288,7 +317,7 @@ def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[]):
                 continue
             cand_smiles.add(smiles)
             candidates.append(amap)
-
+        
         if len(candidates) == 0:
             return
 
@@ -321,12 +350,29 @@ def dfs_assemble(cur_mol, global_amap, fa_amap, cur_node, fa_node):
     singletons = [nei for nei in children if nei.mol.GetNumAtoms() == 1]
     neighbors = singletons + neighbors
 
-    cur_amap = [(fa_nid,a2,a1) for nid,a1,a2 in fa_amap if nid == cur_node.nid]
+    cur_amap = [(fa_nid,a2,a1) for nid,a1,a2 in fa_amap if nid == cur_node.nid] # check if there is any atommap has been occupied previously when attaching with parent
+
+    # print("current", cur_node.nid)
+    # print('cur_amap', cur_amap)
+    # ring_neighbors = [nei for nei in children if nei.mol.GetNumAtoms() >= 3]
+    # if cur_node.mol.GetNumAtoms() == 1 and len(ring_neighbors) > 1: # honey comb structure
+    #     ctr_nei_nid_dict = {nei.nid : (nei, nei.mol, nei.smiles) for nei in cur_node.neighbors}
+    #     parent, parent_mol, parent_smiles = ctr_nei_nid_dict[fa_node.nid]
+    #     cur_node.mol = get_mol(parent_smiles)
+    #     cur_node.smiles = parent_smiles
+    #     cur_node.neighbors = [nei for nei in cur_node.neighbors if nei.nid != fa_node.nid]
+    #     prev_nodes = [] # prev_nodes is basically fa_node, and fa_node is the parent node
+    #     cur_amap = [] # clear singleton mapping because it's changing it's original smiles to it's parent smiles, so there is no node being occupied
+
     cands = enum_assemble(cur_node, neighbors, prev_nodes, cur_amap)
 
-    cand_smiles,cand_amap = zip(*cands)
+    if not cands: return # self added 
+
+    cand_smiles, cand_mols, cand_amap = zip(*cands)
+
     label_idx = cand_smiles.index(cur_node.label)
     label_amap = cand_amap[label_idx]
+
 
     for nei_id,ctr_atom,nei_atom in label_amap:
         if nei_id == fa_nid:
@@ -334,6 +380,16 @@ def dfs_assemble(cur_mol, global_amap, fa_amap, cur_node, fa_node):
         global_amap[nei_id][nei_atom] = global_amap[cur_node.nid][ctr_atom]
     
     cur_mol = attach_mols(cur_mol, children, [], global_amap) #father is already attached
+    
+    # def show_atom_number(mol, label):
+    #     for atom in mol.GetAtoms():
+    #         atom.SetProp(label, str(atom.GetIdx()))
+    #     return mol
+    
+    # test_mol = show_atom_number(Chem.RWMol(cur_mol), "molAtomMapNumber")
+    # print('cur_mol', Chem.MolToSmiles(test_mol))
+    # print("Attaching big mol done")
+    # print()
     for nei_node in children:
         if not nei_node.is_leaf:
             dfs_assemble(cur_mol, global_amap, label_amap, nei_node, cur_node)
@@ -344,9 +400,16 @@ if __name__ == "__main__":
     lg = rdkit.RDLogger.logger() 
     lg.setLevel(rdkit.RDLogger.CRITICAL)
     
-    smiles = ["O=C1[C@@H]2C=C[C@@H](C=CC2)C1(c1ccccc1)c1ccccc1","O=C([O-])CC[C@@]12CCCC[C@]1(O)OC(=O)CC2", "ON=C1C[C@H]2CC3(C[C@@H](C1)c1ccccc12)OCCO3", "C[C@H]1CC(=O)[C@H]2[C@@]3(O)C(=O)c4cccc(O)c4[C@@H]4O[C@@]43[C@@H](O)C[C@]2(O)C1", 'Cc1cc(NC(=O)CSc2nnc3c4ccccc4n(C)c3n2)ccc1Br', 'CC(C)(C)c1ccc(C(=O)N[C@H]2CCN3CCCc4cccc2c43)cc1', "O=c1c2ccc3c(=O)n(-c4nccs4)c(=O)c4ccc(c(=O)n1-c1nccs1)c2c34", "O=C(N1CCc2c(F)ccc(F)c2C1)C1(O)Cc2ccccc2C1"]
-    mol_tree = MolTree("C")
-    assert len(mol_tree.nodes) > 0
+    smiles = ["O=C1[C@@H]2C=C[C@@H](C=CC2)C1(c1ccccc1)c1ccccc1",
+                "O=C([O-])CC[C@@]12CCCC[C@]1(O)OC(=O)CC2",
+                "ON=C1C[C@H]2CC3(C[C@@H](C1)c1ccccc12)OCCO3",
+                "C[C@H]1CC(=O)[C@H]2[C@@]3(O)C(=O)c4cccc(O)c4[C@@H]4O[C@@]43[C@@H](O)C[C@]2(O)C1",
+                'Cc1cc(NC(=O)CSc2nnc3c4ccccc4n(C)c3n2)ccc1Br',
+                'CC(C)(C)c1ccc(C(=O)N[C@H]2CCN3CCCc4cccc2c43)cc1',
+                "O=c1c2ccc3c(=O)n(-c4nccs4)c(=O)c4ccc(c(=O)n1-c1nccs1)c2c34",
+                "O=C(N1CCc2c(F)ccc(F)c2C1)C1(O)Cc2ccccc2C1"]
+    # mol_tree = MolTree("C")
+    # assert len(mol_tree.nodes) > 0
 
     def tree_test():
         for s in sys.stdin:
@@ -359,8 +422,14 @@ if __name__ == "__main__":
 
     def decode_test():
         wrong = 0
-        for tot,s in enumerate(sys.stdin):
-            s = s.split()[0]
+        # for tot,s in enumerate(sys.stdin):
+        #     s = s.split()[0]
+        for tot, s in enumerate(smiles[5:]):
+            # s = "CC1CC2C(C)CCC3C(C)CC(C)C(C1)C23"
+            # s = "C1CC2CCC3CCC4CCC5CCC6CCC1C1C2C3C4C5C61"
+            # s = "C1C3C2C(CC1)CCCC2CCC3"
+            # s = "C1CC2CC=CC3CC#CC(C1)C23"
+            # s = "CC(O)F"
             tree = MolTree(s)
             tree.recover()
 
@@ -381,6 +450,12 @@ if __name__ == "__main__":
                 wrong += 1
             print(wrong, tot + 1)
 
+            # print()
+            # print('start', gold_smiles)
+            # print('end__', dec_smiles)
+            # print('inside list?', gold_smiles in decode_stereo(dec_smiles))
+            # print("\n")
+
     def enum_test():
         for s in sys.stdin:
             s = s.split()[0]
@@ -395,9 +470,17 @@ if __name__ == "__main__":
 
     def count():
         cnt,n = 0,0
-        for s in sys.stdin:
-            s = s.split()[0]
+        # for s in sys.stdin:
+        #     s = s.split()[0]
+        for s in smiles[6:]:
             tree = MolTree(s)
+            # print(tree.smiles)
+            # print()
+            # for node in tree.nodes:
+            #     print(node.smiles)
+            #     print([nei.smiles for nei in node.neighbors])
+            #     print()
+            # raise
             tree.recover()
             tree.assemble()
             for node in tree.nodes:
@@ -405,4 +488,6 @@ if __name__ == "__main__":
             n += len(tree.nodes)
             #print(cnt * 1.0 / n)
     
-    count()
+    # count()
+    decode_test()
+
