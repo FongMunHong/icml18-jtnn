@@ -295,7 +295,7 @@ def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[]):
             return
 
         nei_node = neighbors[depth]
-        print('node smiles',node.smiles, 'nei_node', nei_node.smiles)
+        # print('node smiles',node.smiles, 'nei_node', nei_node.smiles)
 
         # [(nei_idx, atom.GetIdx(), b1.GetIdx())] elements of cur_amap
         # nei_idx -> (MolTreeNode) neighbor node.nid, assigned before entering enum_assemble to differentiate between MolTreeNode
