@@ -3,3 +3,9 @@ processed/
 molvae/run*
 molvae/pre_model*
 molvae/vae_model*
+!molvae/pre_model_rd2018_cuda113
+!molvae/pre_model_rd2018_cuda116
+!molvae/vae_model_rd2018_cuda113
+!molvae/run_vae_rd2018_cuda113.txt
+!molvae/run_pre_rd2018_cuda113.txt
+!molvae/run_pre_rd2018_cuda116.txt
